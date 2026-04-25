@@ -34,7 +34,7 @@ export function Scene({ scene }: { scene: SceneJson }) {
       <SceneRenderer scene={scene} />
 
       {/* WASD + mouse-look */}
-      <Controls />
+      <Controls scene={scene} />
     </Canvas>
   );
 }
