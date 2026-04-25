@@ -15,7 +15,6 @@ export function Scene({ scene }: { scene: SceneJson }) {
     >
       {/* Sky and atmosphere */}
       <Sky sunPosition={[100, 20, 100]} turbidity={8} rayleigh={2} />
-      <fog attach="fog" args={["#cfe3ff", 30, 80]} />
 
       {/* Lighting */}
       <ambientLight intensity={0.6} />

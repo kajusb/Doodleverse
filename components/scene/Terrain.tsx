@@ -12,7 +12,7 @@ const TERRAIN_COLORS: Record<TerrainType, string> = {
 
 export function Terrain({
   terrain,
-  size = 40,
+  size = 1000,
 }: {
   terrain: TerrainType;
   size?: number;

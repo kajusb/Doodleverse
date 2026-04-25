@@ -28,7 +28,7 @@ function renderObject(obj: SceneObject, key: number) {
 export function SceneRenderer({ scene }: { scene: SceneJson }) {
   return (
     <>
-      <Terrain terrain={scene.terrain} size={scene.size ?? 40} />
+      <Terrain terrain={scene.terrain} size={500} />
       {scene.objects.map((obj, i) => renderObject(obj, i))}
     </>
   );
