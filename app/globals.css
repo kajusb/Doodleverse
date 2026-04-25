@@ -3,11 +3,40 @@
 html, body {
   margin: 0;
   padding: 0;
-  overflow: hidden;
   background: #000;
 }
 
+/* Lock scroll only when a 3D canvas is on the page */
+body:has(canvas) {
+  overflow: hidden;
+}
 
+/* Fade-in animation for AI thinking messages.
+   Duration matches THOUGHT_DURATION_MS in upload/page.tsx (3500ms).
+   Most of the time is spent fully visible; quick fade in/out at edges. */
+@keyframes thoughtFade {
+  0%   { opacity: 0; transform: translateY(8px); }
+  10%  { opacity: 1; transform: translateY(0); }
+  90%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+.thought-fade {
+  animation: thoughtFade 3.5s ease-in-out forwards;
+}
+
+/* For the final/closer thought — fades in but stays visible */
+@keyframes thoughtFadeIn {
+  0%   { opacity: 0; transform: translateY(8px); }
+  20%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.thought-fade-in {
+  animation: thoughtFadeIn 0.8s ease-out forwards;
+}
+
+/* Hide the dev error overlay */
 nextjs-portal {
   display: none !important;
 }

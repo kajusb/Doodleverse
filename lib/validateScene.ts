@@ -6,7 +6,6 @@ const VALID_TYPES = new Set<ObjectType>([
 const VALID_THEMES = new Set<Theme>(["forest", "desert", "snow", "meadow", "fantasy"]);
 const VALID_TERRAINS = new Set<Terrain>(["grass", "sand", "snow", "stone", "dirt"]);
 
-
 function findLastJsonBlock(text: string): string | null {
   let depth = 0;
   let end = -1;
