@@ -30,4 +30,8 @@ export interface SceneJson {
   objects: SceneObject[];
   size?: number;
   music?: string;
+  skyColor?: string;
+  groundColor?: string;
+  fogColor?: string;
+  sunPosition?: [number, number, number];
 }

@@ -7,7 +7,29 @@ import { SceneRenderer } from "./SceneRenderer";
 import { CollisionProvider } from "@/lib/collisionRegistry";
 import type { SceneJson } from "@/types/scene";
 
+// Default sun position when the AI didn't provide one — overhead daytime.
+const DEFAULT_SUN: [number, number, number] = [0.3, 1, 0.3];
+
 export function Scene({ scene }: { scene: SceneJson }) {
+  // Sun direction drives both Sky atmosphere and the directional light.
+  const sun = scene.sunPosition ?? DEFAULT_SUN;
+  const sunDistance = 100;
+  const sunWorldPos: [number, number, number] = [
+    sun[0] * sunDistance,
+    sun[1] * sunDistance,
+    sun[2] * sunDistance,
+  ];
+
+  // Fog: prefer the AI's color, fall back to a neutral light haze.
+  // Use exponential fog (fogExp2) for natural-looking atmospheric falloff.
+  // Density 0.012 = subtle haze far away, fully clear up close.
+  const fogColor = scene.fogColor ?? "#b8d8f0";
+  const fogDensity = 0.012;
+
+  // If the AI gave us a skyColor, swap from procedural Sky to a solid background.
+  // Solid color blends much better with custom fog and lets us match moody scenes.
+  const useCustomSky = !!scene.skyColor;
+
   return (
     <Canvas
       shadows
@@ -15,12 +37,19 @@ export function Scene({ scene }: { scene: SceneJson }) {
       style={{ width: "100vw", height: "100vh" }}
     >
       {/* Sky and atmosphere */}
-      <Sky sunPosition={[100, 20, 100]} turbidity={8} rayleigh={2} />
+      {useCustomSky ? (
+        <color attach="background" args={[scene.skyColor!]} />
+      ) : (
+        <Sky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
+      )}
+      {/* Exponential fog — natural atmospheric falloff. Distant objects fade
+          smoothly into the fog color, no sharp band, no aggressive close-up haze. */}
+      <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
 
-      {/* Lighting */}
+      {/* Lighting — sun direction matches the sky */}
       <ambientLight intensity={0.6} />
       <directionalLight
-        position={[20, 30, 10]}
+        position={sunWorldPos}
         intensity={1.2}
         castShadow
         shadow-mapSize-width={1024}
@@ -31,7 +60,7 @@ export function Scene({ scene }: { scene: SceneJson }) {
         shadow-camera-bottom={-30}
       />
 
-      {/* Eery object inside reports its bounding box,
+      {/* Collision registry — every object inside reports its bounding box,
           Controls reads them every frame */}
       <CollisionProvider>
         {/* World content (terrain + every object from the JSON) */}

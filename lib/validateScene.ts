@@ -6,6 +6,8 @@ const VALID_TYPES = new Set<ObjectType>([
 const VALID_THEMES = new Set<Theme>(["forest", "desert", "snow", "meadow", "fantasy"]);
 const VALID_TERRAINS = new Set<Terrain>(["grass", "sand", "snow", "stone", "dirt"]);
 
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
 function findLastJsonBlock(text: string): string | null {
   let depth = 0;
   let end = -1;
@@ -43,6 +45,11 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function hexOrUndefined(v: unknown): string | undefined {
+  if (typeof v === "string" && HEX_RE.test(v)) return v;
+  return undefined;
+}
+
 function sanitizeObject(raw: unknown): SceneObject | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -70,6 +77,15 @@ function sanitizeObject(raw: unknown): SceneObject | null {
   return obj;
 }
 
+function sanitizeSunPos(raw: unknown): [number, number, number] | undefined {
+  if (!Array.isArray(raw) || raw.length !== 3) return undefined;
+  // Clamp and sanitize each component
+  const x = Math.max(-1, Math.min(1, num(raw[0], 0.3)));
+  const y = Math.max(0.1, Math.min(1, num(raw[1], 1)));
+  const z = Math.max(-1, Math.min(1, num(raw[2], 0.3)));
+  return [x, y, z];
+}
+
 export function validateScene(rawResponse: string): SceneJson {
   const parsed = extractJson(rawResponse);
   if (!parsed || typeof parsed !== "object") {
@@ -95,5 +111,9 @@ export function validateScene(rawResponse: string): SceneJson {
     objects,
     size: typeof p.size === "number" ? p.size : 40,
     music: typeof p.music === "string" ? p.music : undefined,
+    skyColor: hexOrUndefined(p.skyColor),
+    groundColor: hexOrUndefined(p.groundColor),
+    fogColor: hexOrUndefined(p.fogColor),
+    sunPosition: sanitizeSunPos(p.sunPosition),
   };
 }
