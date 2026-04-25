@@ -48,9 +48,7 @@ export default function ViewPage() {
 
     const startAudio = async () => {
       try {
-        // Fetch and decode the audio bytes into a buffer we can loop in-memory.
-        // This is the trick that makes loops gapless — <audio loop> has tiny
-        // silences at boundaries, but AudioBufferSourceNode wraps perfectly.
+        // Fetch and decode the audio bytes into a buffer we can loop in-memory
         const res = await fetch(state.musicUrl!);
         const arrayBuf = await res.arrayBuffer();
 
@@ -67,10 +65,9 @@ export default function ViewPage() {
         const source = ctx.createBufferSource();
         source.buffer = audioBuf;
         source.loop = true;
-        // Trim the encoder padding off the loop boundaries (~10ms each side).
-        // Most MP3 encoders add ~30ms of silence; we skip past it on loop.
-        source.loopStart = 0.05;
-        source.loopEnd = audioBuf.duration - 0.05;
+        // Trim the encoder padding off the loop boundaries (~10ms each side)
+        source.loopStart = 0.25;
+        source.loopEnd = audioBuf.duration - 0.25;
 
         const gain = ctx.createGain();
         gain.gain.value = 0.5;
