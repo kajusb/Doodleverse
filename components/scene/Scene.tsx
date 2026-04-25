@@ -1,6 +1,7 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { Controls } from "./Controls";
 
 export function Scene() {
   return (
@@ -28,6 +29,7 @@ export function Scene() {
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="orange" />
       </mesh>
+      <Controls />
     </Canvas>
   );
 }
