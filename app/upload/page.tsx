@@ -114,7 +114,7 @@ export default function UploadPage() {
 
         <div className="mt-6 flex gap-3 justify-center">
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/sample")}
             className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 transition"
           >
             View sample world
