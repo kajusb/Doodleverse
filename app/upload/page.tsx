@@ -9,8 +9,10 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [withMusic, setWithMusic] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pickFile = (f: File) => {
@@ -35,23 +37,55 @@ export default function UploadPage() {
     if (!file) return;
     setLoading(true);
     setError(null);
+    setLoadingStage("Interpreting your sketch…");
+
     try {
+      // Scene generation always runs
       const form = new FormData();
       form.append("image", file);
-      const res = await fetch("/api/generate-scene", {
-        method: "POST",
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `Request failed (${res.status})`);
+      const sceneRes = await fetch("/api/generate-scene", { method: "POST", body: form });
+      const sceneData = await sceneRes.json();
+      if (!sceneRes.ok) throw new Error(sceneData.error || `Scene request failed (${sceneRes.status})`);
+      const scene: SceneJson = sceneData.scene;
+
+      sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
+      // Always wipe any leftover music from a prior generation
+      sessionStorage.removeItem("doodleverse:music");
+
+      // Music only runs if the user opted in AND Gemma produced a prompt
+      if (withMusic && scene.music) {
+        setLoadingStage("Composing music to match your world…");
+        try {
+          const musicRes = await fetch("/api/generate-music", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: scene.music, lengthMs: 30000 }),
+          });
+          if (musicRes.ok) {
+            const blob = await musicRes.blob();
+            const dataUrl: string = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+            sessionStorage.setItem("doodleverse:music", dataUrl);
+          } else {
+            // Music failed but the scene is fine — proceed silently
+            const errData = await musicRes.json().catch(() => ({}));
+            console.warn("Music generation failed:", errData);
+          }
+        } catch (e) {
+          console.warn("Music generation error:", e);
+        }
       }
-      sessionStorage.setItem("doodleverse:scene", JSON.stringify(data.scene as SceneJson));
+
       router.push("/view");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
       setLoading(false);
+      setLoadingStage("");
     }
   };
 
@@ -68,6 +102,7 @@ export default function UploadPage() {
           </p>
         </div>
 
+        {/* Drop zone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
@@ -106,6 +141,21 @@ export default function UploadPage() {
           )}
         </div>
 
+        {/* Music opt-in toggle */}
+        <label className="mt-5 flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={withMusic}
+            onChange={(e) => setWithMusic(e.target.checked)}
+            disabled={loading}
+            className="w-5 h-5 accent-purple-500 cursor-pointer"
+          />
+          <span className="text-sm">
+            <span className="font-semibold">♪ Generate background music</span>
+            <span className="opacity-60 ml-2">(adds ~30s)</span>
+          </span>
+        </label>
+
         {error && (
           <div className="mt-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-sm">
             {error}
@@ -115,7 +165,8 @@ export default function UploadPage() {
         <div className="mt-6 flex gap-3 justify-center">
           <button
             onClick={() => router.push("/sample")}
-            className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 transition"
+            disabled={loading}
+            className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 transition"
           >
             View sample world
           </button>
@@ -128,9 +179,9 @@ export default function UploadPage() {
           </button>
         </div>
 
-        {loading && (
+        {loading && loadingStage && (
           <div className="mt-6 text-center text-sm opacity-70">
-            Gemma is interpreting your sketch… (10-30s)
+            {loadingStage}
           </div>
         )}
       </div>

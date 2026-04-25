@@ -6,3 +6,8 @@ html, body {
   overflow: hidden;
   background: #000;
 }
+
+
+nextjs-portal {
+  display: none !important;
+}

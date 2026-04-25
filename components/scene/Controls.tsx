@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { PointerLockControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { SceneJson } from "@/types/scene";
@@ -166,12 +166,12 @@ export function Controls({
         return (groupTop - standingY) > stepUpHeight;
       };
 
-      // Try X.
+      // Try X
       const xBlock = findBlockingBox(blockers, camera.position.x + dx, bodyY, camera.position.z);
       if (!xBlock || !isImpassable(xBlock)) {
         camera.position.x += dx;
       }
-      // Try Z.
+      // Try Z
       const zBlock = findBlockingBox(blockers, camera.position.x, bodyY, camera.position.z + dz);
       if (!zBlock || !isImpassable(zBlock)) {
         camera.position.z += dz;
@@ -220,5 +220,42 @@ export function Controls({
     }
   });
 
-  return <PointerLockControls />;
+  return <SafePointerLockControls />;
+}
+
+// Wraps Drei's PointerLockControls and silently absorbs the SecurityError
+// the browser throws when you spam Esc + click. The error is harmless but
+// surfaces as a Next.js error overlay if not caught
+function SafePointerLockControls() {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    // Catch synchronous throws from rapid re-lock attempts
+    const onClick = () => {
+      try {
+        canvas.requestPointerLock();
+      } catch {
+        // Browser cooldown — ignore, user can try again
+      }
+    };
+    canvas.addEventListener("click", onClick);
+
+    // Catch async rejections from the lock promise
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      const msg = String(e.reason?.message ?? e.reason ?? "");
+      if (msg.includes("pointer lock") || msg.includes("exited the lock")) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", onUnhandled);
+
+    return () => {
+      canvas.removeEventListener("click", onClick);
+      window.removeEventListener("unhandledrejection", onUnhandled);
+    };
+  }, [gl]);
+
+  return <PointerLockControls onLock={() => {}} onUnlock={() => {}} />;
 }

@@ -1,7 +1,6 @@
-"use no memo";
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { SceneJson } from "@/types/scene";
@@ -13,12 +12,14 @@ const Scene = dynamic(
 
 type LoadState =
   | { status: "loading" }
-  | { status: "ready"; scene: SceneJson }
+  | { status: "ready"; scene: SceneJson; musicUrl: string | null }
   | { status: "missing" };
 
 export default function ViewPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [needsClickToPlay, setNeedsClickToPlay] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("doodleverse:scene");
@@ -28,11 +29,37 @@ export default function ViewPage() {
     }
     try {
       const scene = JSON.parse(raw) as SceneJson;
-      setState({ status: "ready", scene });
+      const musicUrl = sessionStorage.getItem("doodleverse:music");
+      setState({ status: "ready", scene, musicUrl });
     } catch {
       setState({ status: "missing" });
     }
   }, []);
+
+  // Try to start music as soon as the scene is ready
+  useEffect(() => {
+    if (state.status !== "ready" || !state.musicUrl) return;
+
+    const audio = new Audio(state.musicUrl);
+    audio.loop = true;
+    audio.volume = 0.5;
+    audioRef.current = audio;
+
+    audio.play().catch(() => {
+      // Browser blocked autoplay. Wait for the first user click to retry
+      setNeedsClickToPlay(true);
+      const tryPlay = () => {
+        audio.play().then(() => setNeedsClickToPlay(false)).catch(() => {});
+        window.removeEventListener("click", tryPlay);
+      };
+      window.addEventListener("click", tryPlay);
+    });
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, [state]);
 
   if (state.status === "loading") return null;
 
@@ -53,12 +80,21 @@ export default function ViewPage() {
   return (
     <>
       <Scene scene={state.scene} />
+
+      {/* Single button: back to upload */}
       <button
         onClick={() => router.push("/upload")}
         className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition text-sm z-10"
       >
         ← New sketch
       </button>
+
+      {/* Subtle hint if browser blocked music autoplay */}
+      {needsClickToPlay && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none">
+          Click anywhere to enable music
+        </div>
+      )}
     </>
   );
 }
