@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { sampleScene } from "@/lib/sampleScene";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
@@ -8,5 +9,5 @@ const Scene = dynamic(
 );
 
 export default function Home() {
-  return <Scene />;
+  return <Scene scene={sampleScene} />;
 }
