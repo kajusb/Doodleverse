@@ -29,4 +29,5 @@ export interface SceneJson {
   terrain: Terrain;
   objects: SceneObject[];
   size?: number;
+  music?: string;
 }
