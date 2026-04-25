@@ -9,6 +9,7 @@ export type ObjectType =
 
 export type Theme = "forest" | "desert" | "snow" | "meadow" | "fantasy";
 export type Terrain = "grass" | "sand" | "snow" | "stone" | "dirt";
+export type FogDensity = "none" | "light" | "medium" | "heavy";
 
 export interface SceneObject {
   type: ObjectType;
@@ -33,5 +34,6 @@ export interface SceneJson {
   skyColor?: string;
   groundColor?: string;
   fogColor?: string;
+  fogDensity?: FogDensity;
   sunPosition?: [number, number, number];
 }

@@ -1,10 +1,11 @@
-import type { SceneJson, SceneObject, ObjectType, Theme, Terrain } from "@/types/scene";
+import type { SceneJson, SceneObject, ObjectType, Theme, Terrain, FogDensity } from "@/types/scene";
 
 const VALID_TYPES = new Set<ObjectType>([
   "tree", "house", "rock", "river", "path", "bridge", "water",
 ]);
 const VALID_THEMES = new Set<Theme>(["forest", "desert", "snow", "meadow", "fantasy"]);
 const VALID_TERRAINS = new Set<Terrain>(["grass", "sand", "snow", "stone", "dirt"]);
+const VALID_FOG_DENSITIES = new Set<FogDensity>(["none", "light", "medium", "heavy"]);
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 
@@ -79,7 +80,6 @@ function sanitizeObject(raw: unknown): SceneObject | null {
 
 function sanitizeSunPos(raw: unknown): [number, number, number] | undefined {
   if (!Array.isArray(raw) || raw.length !== 3) return undefined;
-  // Clamp and sanitize each component
   const x = Math.max(-1, Math.min(1, num(raw[0], 0.3)));
   const y = Math.max(0.1, Math.min(1, num(raw[1], 1)));
   const z = Math.max(-1, Math.min(1, num(raw[2], 0.3)));
@@ -114,6 +114,9 @@ export function validateScene(rawResponse: string): SceneJson {
     skyColor: hexOrUndefined(p.skyColor),
     groundColor: hexOrUndefined(p.groundColor),
     fogColor: hexOrUndefined(p.fogColor),
+    fogDensity: VALID_FOG_DENSITIES.has(p.fogDensity as FogDensity)
+      ? (p.fogDensity as FogDensity)
+      : undefined,
     sunPosition: sanitizeSunPos(p.sunPosition),
   };
 }

@@ -49,6 +49,14 @@ For fogColor:
 - Example: if skyColor is "#ff8c5a" (sunset orange), fogColor should be "#e8a888" (muted warm).
 - The fog color must NEVER be a wildly different color from the sky — it must blend.
 
+For fogDensity, pick one of: "none", "light", "medium", "heavy".
+- "none" → bright clear day, desert noon, snow scene with crisp visibility
+- "light" → typical day with subtle atmospheric haze, default for most scenes
+- "medium" → moody scenes, sunset, autumn, slight mist visible in middle distance
+- "heavy" → spooky/foggy scenes, night with mist, swampy areas, mysterious mornings — the fog is clearly visible all around you
+- If the drawing shows mist, fog, clouds at ground level, or smoke → use "heavy"
+- If the drawing is bright and crisp with sharp edges → use "none" or "light"
+
 For sunPosition [x, y, z]:
 - x and z are the horizontal direction (-1 to 1), y is the height (0.1 to 1).
 - Overhead noon = [0.3, 1, 0.3]
@@ -63,7 +71,7 @@ RULES:
 4. Use rotation in radians. Math.PI/2 ≈ 1.57 = rotated 90°.
 5. Keep scale values between 0.5 and 2.5.
 6. Give the scene a short evocative name.
-7. ALWAYS include skyColor, groundColor, fogColor, and sunPosition. fogColor MUST blend with skyColor.
+7. ALWAYS include skyColor, groundColor, fogColor, fogDensity, and sunPosition. fogColor MUST blend with skyColor.
 8. "music" must be a detailed 150-250 word prompt for a SEAMLESS LOOPING ambient soundscape. Begin with "SEAMLESS LOOP. The audio must start at full volume and end at full volume with no fade in and no fade out. The first second and the last second must sound identical so the audio loops perfectly without any silence, gap, or volume change." End with "Constant volume from start to finish. No fade. No silence at boundaries." Match instruments and ambience to actual scene objects (rivers → water sounds, trees → wind/birds, etc). Specify genre, instruments, texture, mood, tempo. NEVER name real artists, bands, or songs.
 
 OUTPUT SCHEMA:
@@ -74,6 +82,7 @@ OUTPUT SCHEMA:
   "skyColor": "#rrggbb",
   "groundColor": "#rrggbb",
   "fogColor": "#rrggbb",
+  "fogDensity": "none" | "light" | "medium" | "heavy",
   "sunPosition": [x, y, z],
   "music": string,
   "objects": [
@@ -81,7 +90,7 @@ OUTPUT SCHEMA:
   ]
 }
 
-EXAMPLE OUTPUT for a sketch with a clearly drawn dark blue night sky and a haunted house:
+EXAMPLE OUTPUT for a sketch with a dark blue night sky, a haunted house, and visible mist:
 {
   "name": "Haunted Hollow",
   "theme": "fantasy",
@@ -89,6 +98,7 @@ EXAMPLE OUTPUT for a sketch with a clearly drawn dark blue night sky and a haunt
   "skyColor": "#0a0a2a",
   "groundColor": "#1f2820",
   "fogColor": "#1a1a3a",
+  "fogDensity": "heavy",
   "sunPosition": [0.3, 0.3, 0.3],
   "music": "SEAMLESS LOOP. The audio must start at full volume and end at full volume with no fade in and no fade out. The first second and the last second must sound identical so the audio loops perfectly without any silence, gap, or volume change. Dark ambient drone with low sustained organ pad, distant owl hoots, gentle wind through dead branches. Texture: misty and reverberant. Atmosphere: ominous and watchful. Tempo: very slow. Constant volume from start to finish. No fade. No silence at boundaries.",
   "objects": [
@@ -98,7 +108,7 @@ EXAMPLE OUTPUT for a sketch with a clearly drawn dark blue night sky and a haunt
   ]
 }
 
-EXAMPLE OUTPUT for a riverside cottage drawn on a plain white background (no sky drawn):
+EXAMPLE OUTPUT for a riverside cottage drawn on a plain white background:
 {
   "name": "Riverside Cottage",
   "theme": "forest",
@@ -106,6 +116,7 @@ EXAMPLE OUTPUT for a riverside cottage drawn on a plain white background (no sky
   "skyColor": "#87ceeb",
   "groundColor": "#6aa84f",
   "fogColor": "#a8c8d8",
+  "fogDensity": "light",
   "sunPosition": [0.3, 1, 0.3],
   "music": "SEAMLESS LOOP. The audio must start at full volume and end at full volume with no fade in and no fade out. The first second and the last second must sound identical so the audio loops perfectly without any silence, gap, or volume change. One continuous static texture. Genre: neoclassical ambient with lo-fi tape saturation. Instruments: sustained warm cello pad, soft felted piano notes. Sound design: river contributes constant soft babble, trees add subtle wind through leaves. Texture: reverberant outdoor space. Atmosphere: peaceful, golden-hour warm. Tempo: very slow. Constant volume from start to finish. No fade. No silence at boundaries.",
   "objects": [

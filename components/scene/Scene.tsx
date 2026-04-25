@@ -5,13 +5,20 @@ import { Sky } from "@react-three/drei";
 import { Controls } from "./Controls";
 import { SceneRenderer } from "./SceneRenderer";
 import { CollisionProvider } from "@/lib/collisionRegistry";
-import type { SceneJson } from "@/types/scene";
+import type { SceneJson, FogDensity } from "@/types/scene";
 
-// Default sun position when the AI didn't provide one — overhead daytime.
 const DEFAULT_SUN: [number, number, number] = [0.3, 1, 0.3];
 
+// Maps the AI's fog category to actual exponential density values.
+// Tuned for visible-but-not-overwhelming fog at our scene scale
+const FOG_DENSITY_MAP: Record<FogDensity, number> = {
+  none: 0,
+  light: 0.012,    // subtle atmospheric haze, default
+  medium: 0.025,   // visible mist in middle distance, moody
+  heavy: 0.05,     // clearly fogged scene, mysterious / spooky
+};
+
 export function Scene({ scene }: { scene: SceneJson }) {
-  // Sun direction drives both Sky atmosphere and the directional light.
   const sun = scene.sunPosition ?? DEFAULT_SUN;
   const sunDistance = 100;
   const sunWorldPos: [number, number, number] = [
@@ -20,14 +27,11 @@ export function Scene({ scene }: { scene: SceneJson }) {
     sun[2] * sunDistance,
   ];
 
-  // Fog: prefer the AI's color, fall back to a neutral light haze.
-  // Use exponential fog (fogExp2) for natural-looking atmospheric falloff.
-  // Density 0.012 = subtle haze far away, fully clear up close.
+  // Pick fog values from AI hints
   const fogColor = scene.fogColor ?? "#b8d8f0";
-  const fogDensity = 0.012;
+  const fogDensityKey: FogDensity = scene.fogDensity ?? "light";
+  const fogDensity = FOG_DENSITY_MAP[fogDensityKey];
 
-  // If the AI gave us a skyColor, swap from procedural Sky to a solid background.
-  // Solid color blends much better with custom fog and lets us match moody scenes.
   const useCustomSky = !!scene.skyColor;
 
   return (
@@ -42,11 +46,12 @@ export function Scene({ scene }: { scene: SceneJson }) {
       ) : (
         <Sky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
       )}
-      {/* Exponential fog — natural atmospheric falloff. Distant objects fade
-          smoothly into the fog color, no sharp band, no aggressive close-up haze. */}
-      <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
+      {/* Exponential fog. Density 0 means no fog at all (just don't render it). */}
+      {fogDensity > 0 && (
+        <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
+      )}
 
-      {/* Lighting — sun direction matches the sky */}
+      {/* Lighting */}
       <ambientLight intensity={0.6} />
       <directionalLight
         position={sunWorldPos}
@@ -60,13 +65,9 @@ export function Scene({ scene }: { scene: SceneJson }) {
         shadow-camera-bottom={-30}
       />
 
-      {/* Collision registry — every object inside reports its bounding box,
-          Controls reads them every frame */}
+      {/* Collision registry */}
       <CollisionProvider>
-        {/* World content (terrain + every object from the JSON) */}
         <SceneRenderer scene={scene} />
-
-        {/* WASD + mouse-look */}
         <Controls scene={scene} />
       </CollisionProvider>
     </Canvas>
