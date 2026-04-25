@@ -28,7 +28,17 @@ RULES:
 4. Use rotation in radians. 0 = along Z. Math.PI/2 ≈ 1.57 = rotated 90°.
 5. Keep scale values between 0.5 and 2.5.
 6. Give the scene a short, evocative name based on its content.
-7. "music" must be a short prompt under 100 words describing background music that fits the scene's mood. Specify genre, instruments, tempo, and atmosphere. NEVER mention real artists, bands, or songs by name. Examples: "calm acoustic guitar with gentle birdsong, peaceful folk ambience, slow tempo, warm and serene" or "haunting orchestral strings with distant choir, slow tempo, mysterious and otherworldly".
+7. "music" must be a detailed prompt (100-200 words) describing background music that fits the scene's mood. CRITICAL CONSTRAINTS for the music prompt: it must describe a SEAMLESS LOOPING ambient soundscape — no intro, no outro, no resolution, no buildup, no fade in or out. Specify "looping ambient texture", "no melody resolution", "constant atmosphere", "static drone-based" or similar phrases that ensure the audio sounds the same at the end as the beginning.
+
+Be SPECIFIC and EVOCATIVE. Include:
+- Genre and subgenre (e.g. "dark ambient", "neoclassical drone", "lo-fi forest folk", "world music ambient", "post-rock soundscape")
+- Specific instruments (e.g. "felted piano", "bowed cello", "acoustic guitar harmonics", "tibetan singing bowls", "mellotron strings", "field recordings of rain")
+- Texture details (e.g. "warm tape saturation", "reverberant", "lo-fi grain", "icy crystalline", "deep sub-bass undertone")
+- Atmosphere/mood (e.g. "melancholic but hopeful", "ominous and watchful", "peaceful and golden-hour warm", "dreamy and weightless")
+- Tempo descriptor ("very slow", "stately", "gently flowing", "static")
+- Sound design touches that fit the scene (e.g. "occasional distant birdsong", "subtle wind through leaves", "faint creek water in the background")
+
+NEVER mention real artists, bands, or songs by name.
 
 OUTPUT SCHEMA:
 {
@@ -46,7 +56,7 @@ EXAMPLE OUTPUT for a sketch showing a house with two trees and a river:
   "name": "Riverside Cottage",
   "theme": "forest",
   "terrain": "grass",
-  "music": "calm acoustic guitar with soft strings and gentle birdsong, peaceful folk ambience, slow tempo, warm and pastoral",
+  "music": "Looping pastoral ambient soundscape with no melody resolution or buildup. Sustained warm string pad layered with soft felted piano notes that drift in and out without resolving. Subtle acoustic guitar harmonics shimmer in the distance. Underneath, a gentle low-frequency drone provides constant atmosphere. Sound design includes faint birdsong, soft wind through leaves, and the distant murmur of flowing water from the river. Genre is neoclassical ambient with lo-fi tape saturation giving everything a slightly grainy, dreamlike quality. Tempo is very slow and weightless. Mood is peaceful, golden-hour warm, nostalgic but hopeful. Texture is reverberant and spacious like a wide outdoor field at dusk. Constant static atmosphere throughout — sounds the same at every moment.",
   "objects": [
     { "type": "house", "x": 0, "z": 0, "scale": 1.2 },
     { "type": "tree", "x": -3, "z": 2 },

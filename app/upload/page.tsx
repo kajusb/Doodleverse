@@ -40,7 +40,6 @@ export default function UploadPage() {
     setLoadingStage("Interpreting your sketch…");
 
     try {
-      // Scene generation always runs
       const form = new FormData();
       form.append("image", file);
       const sceneRes = await fetch("/api/generate-scene", { method: "POST", body: form });
@@ -49,17 +48,17 @@ export default function UploadPage() {
       const scene: SceneJson = sceneData.scene;
 
       sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
-      // Always wipe any leftover music from a prior generation
       sessionStorage.removeItem("doodleverse:music");
 
       // Music only runs if the user opted in AND Gemma produced a prompt
       if (withMusic && scene.music) {
         setLoadingStage("Composing music to match your world…");
         try {
+          // 10s loop costs 1/3 the credits and loops cleanly with Web Audio
           const musicRes = await fetch("/api/generate-music", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: scene.music, lengthMs: 30000 }),
+            body: JSON.stringify({ prompt: scene.music, lengthMs: 15000 }),
           });
           if (musicRes.ok) {
             const blob = await musicRes.blob();
@@ -71,7 +70,6 @@ export default function UploadPage() {
             });
             sessionStorage.setItem("doodleverse:music", dataUrl);
           } else {
-            // Music failed but the scene is fine — proceed silently
             const errData = await musicRes.json().catch(() => ({}));
             console.warn("Music generation failed:", errData);
           }
@@ -102,7 +100,6 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Drop zone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
@@ -141,7 +138,6 @@ export default function UploadPage() {
           )}
         </div>
 
-        {/* Music opt-in toggle */}
         <label className="mt-5 flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -152,7 +148,7 @@ export default function UploadPage() {
           />
           <span className="text-sm">
             <span className="font-semibold">♪ Generate background music</span>
-            <span className="opacity-60 ml-2">(adds ~30s)</span>
+            <span className="opacity-60 ml-2">(adds ~15s)</span>
           </span>
         </label>
 

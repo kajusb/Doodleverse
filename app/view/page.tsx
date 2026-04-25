@@ -19,7 +19,11 @@ export default function ViewPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [needsClickToPlay, setNeedsClickToPlay] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Web Audio API refs — gives us a gapless loop unlike <audio>
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("doodleverse:scene");
@@ -36,28 +40,76 @@ export default function ViewPage() {
     }
   }, []);
 
-  // Try to start music as soon as the scene is ready
+  // Set up gapless looping audio when the scene is ready
   useEffect(() => {
     if (state.status !== "ready" || !state.musicUrl) return;
 
-    const audio = new Audio(state.musicUrl);
-    audio.loop = true;
-    audio.volume = 0.5;
-    audioRef.current = audio;
+    let cancelled = false;
 
-    audio.play().catch(() => {
-      // Browser blocked autoplay. Wait for the first user click to retry
-      setNeedsClickToPlay(true);
-      const tryPlay = () => {
-        audio.play().then(() => setNeedsClickToPlay(false)).catch(() => {});
-        window.removeEventListener("click", tryPlay);
-      };
-      window.addEventListener("click", tryPlay);
-    });
+    const startAudio = async () => {
+      try {
+        // Fetch and decode the audio bytes into a buffer we can loop in-memory.
+        // This is the trick that makes loops gapless — <audio loop> has tiny
+        // silences at boundaries, but AudioBufferSourceNode wraps perfectly.
+        const res = await fetch(state.musicUrl!);
+        const arrayBuf = await res.arrayBuffer();
+
+        // Use webkit prefix as fallback for older Safari
+        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new Ctx();
+        const audioBuf = await ctx.decodeAudioData(arrayBuf);
+
+        if (cancelled) {
+          ctx.close();
+          return;
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuf;
+        source.loop = true;
+        // Trim the encoder padding off the loop boundaries (~10ms each side).
+        // Most MP3 encoders add ~30ms of silence; we skip past it on loop.
+        source.loopStart = 0.05;
+        source.loopEnd = audioBuf.duration - 0.05;
+
+        const gain = ctx.createGain();
+        gain.gain.value = 0.5;
+        source.connect(gain).connect(ctx.destination);
+        source.start();
+
+        audioCtxRef.current = ctx;
+        sourceRef.current = source;
+        gainRef.current = gain;
+
+        // If the AudioContext is suspended (browser autoplay block), try to
+        // resume on first click anywhere on the page
+        if (ctx.state === "suspended") {
+          setNeedsClickToPlay(true);
+          const resume = async () => {
+            await ctx.resume();
+            if (ctx.state === "running") {
+              setNeedsClickToPlay(false);
+              window.removeEventListener("click", resume);
+            }
+          };
+          window.addEventListener("click", resume);
+        }
+      } catch (e) {
+        console.warn("Audio setup failed:", e);
+      }
+    };
+
+    startAudio();
 
     return () => {
-      audio.pause();
-      audioRef.current = null;
+      cancelled = true;
+      try {
+        sourceRef.current?.stop();
+      } catch { /* already stopped */ }
+      audioCtxRef.current?.close();
+      sourceRef.current = null;
+      gainRef.current = null;
+      audioCtxRef.current = null;
     };
   }, [state]);
 
@@ -81,7 +133,6 @@ export default function ViewPage() {
     <>
       <Scene scene={state.scene} />
 
-      {/* Single button: back to upload */}
       <button
         onClick={() => router.push("/upload")}
         className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition text-sm z-10"
@@ -89,7 +140,6 @@ export default function ViewPage() {
         ← New sketch
       </button>
 
-      {/* Subtle hint if browser blocked music autoplay */}
       {needsClickToPlay && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none">
           Click anywhere to enable music
