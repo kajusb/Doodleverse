@@ -1,13 +1,19 @@
 "use client";
 
+import { useRef } from "react";
+import * as THREE from "three";
 import type { SceneObject } from "@/types/scene";
+import { useCollider } from "@/lib/useCollider";
 
 export function House({ obj }: { obj: SceneObject }) {
   const s = obj.scale ?? 1;
   const wallColor = obj.color ?? "#c98c5a";
+  const ref = useRef<THREE.Group>(null);
+  useCollider(ref, "block");
 
   return (
     <group
+      ref={ref}
       position={[obj.x, obj.y ?? 0, obj.z]}
       rotation={[0, obj.rotation ?? 0, 0]}
       scale={s}

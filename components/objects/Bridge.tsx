@@ -1,15 +1,21 @@
 "use client";
 
+import { useRef } from "react";
+import * as THREE from "three";
 import type { SceneObject } from "@/types/scene";
+import { useCollider } from "@/lib/useCollider";
 
 export function Bridge({ obj }: { obj: SceneObject }) {
   const s = obj.scale ?? 1;
   const width = obj.width ?? 2;
   const length = obj.length ?? 4;
   const color = obj.color ?? "#8a5a3b";
+  const ref = useRef<THREE.Group>(null);
+  useCollider(ref, "step");
 
   return (
     <group
+      ref={ref}
       position={[obj.x, obj.y ?? 0, obj.z]}
       rotation={[0, obj.rotation ?? 0, 0]}
       scale={s}

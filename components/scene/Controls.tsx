@@ -1,19 +1,84 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { PointerLockControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { SceneJson } from "@/types/scene";
-import {
-  buildCollisionBoxes,
-  findBlockingBox,
-  findGroundUnder,
-  findOverlappingBox,
-} from "@/lib/collisions";
+import { useCollisionRegistry, ColliderBox } from "@/lib/collisionRegistry";
+
+// AABB collision check at one (x, y, z) point against a list of boxes
+function findBlockingBox(
+  boxes: ColliderBox[],
+  x: number,
+  y: number,
+  z: number,
+  radius = 0.3,
+): ColliderBox | null {
+  for (const b of boxes) {
+    const a = b.aabb;
+    if (
+      x + radius > a.minX && x - radius < a.maxX &&
+      z + radius > a.minZ && z - radius < a.maxZ &&
+      y > a.minY && y < a.maxY
+    ) {
+      return b;
+    }
+  }
+  return null;
+}
+
+// Find the topmost box surface beneath (x, z) at or below current y
+function findGroundUnder(
+  boxes: ColliderBox[],
+  x: number,
+  z: number,
+  y: number,
+  radius = 0.3,
+): number {
+  let highest = 0;
+  for (const b of boxes) {
+    const a = b.aabb;
+    const overlapXZ =
+      x + radius > a.minX && x - radius < a.maxX &&
+      z + radius > a.minZ && z - radius < a.maxZ;
+    if (!overlapXZ) continue;
+    if (a.maxY <= y + 0.01 && a.maxY > highest) {
+      highest = a.maxY;
+    }
+  }
+  return highest;
+}
+
+// If the camera overlaps any blocker on the XZ plane, shove it out
+function resolveOverlap(
+  camera: THREE.Camera,
+  boxes: ColliderBox[],
+  bodyY: number,
+  radius = 0.3,
+) {
+  for (const b of boxes) {
+    const a = b.aabb;
+    if (bodyY < a.minY || bodyY > a.maxY) continue;
+    const overlapX = camera.position.x + radius > a.minX && camera.position.x - radius < a.maxX;
+    const overlapZ = camera.position.z + radius > a.minZ && camera.position.z - radius < a.maxZ;
+    if (!overlapX || !overlapZ) continue;
+
+    const pushPosX = a.maxX - (camera.position.x - radius);
+    const pushNegX = (camera.position.x + radius) - a.minX;
+    const pushPosZ = a.maxZ - (camera.position.z - radius);
+    const pushNegZ = (camera.position.z + radius) - a.minZ;
+
+    const minPush = Math.min(pushPosX, pushNegX, pushPosZ, pushNegZ);
+    if (minPush === pushPosX)      camera.position.x += pushPosX + 0.001;
+    else if (minPush === pushNegX) camera.position.x -= pushNegX + 0.001;
+    else if (minPush === pushPosZ) camera.position.z += pushPosZ + 0.001;
+    else                            camera.position.z -= pushNegZ + 0.001;
+  }
+}
 
 export function Controls({
-  scene,
+  scene: _scene,
   speed = 5,
   eyeHeight = 1.6,
   jumpVelocity = 6,
@@ -27,6 +92,7 @@ export function Controls({
   gravity?: number;
   stepUpHeight?: number;
 }) {
+  const reg = useCollisionRegistry();
   const keys = useRef<Record<string, boolean>>({});
   const forward = useRef(new THREE.Vector3());
   const right = useRef(new THREE.Vector3());
@@ -34,9 +100,6 @@ export function Controls({
   // Separate from horizontal so movement still works while airborne
   const verticalVel = useRef(0);
   const onGround = useRef(true);
-
-  // Build collision boxes once per scene
-  const boxes = useMemo(() => buildCollisionBoxes(scene), [scene]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -57,42 +120,13 @@ export function Controls({
     };
   }, [jumpVelocity]);
 
-  // Try to move along one axis. Returns true if the move succeeded.
-  // If blocked by something tall, stops you. If blocked by something short,
-  // gravity branch will lift up smoothly
-  const tryMove = (
-    camera: THREE.Camera,
-    nx: number,
-    nz: number,
-    standingY: number,
-  ): boolean => {
-    const bodyY = camera.position.y - 0.5;
-
-    // No obstacle at body height? Move freely.
-    if (!findBlockingBox(boxes, nx, bodyY, nz)) {
-      camera.position.x = nx;
-      camera.position.z = nz;
-      return true;
-    }
-
-    // Blocked at body height. Could we step up?
-    const obstacle = findOverlappingBox(boxes, nx, nz);
-    if (obstacle) {
-      const stepHeight = obstacle.maxY - standingY;
-      if (stepHeight > 0 && stepHeight <= stepUpHeight) {
-        // Allow the move; gravity branch will ease the camera up.
-        camera.position.x = nx;
-        camera.position.z = nz;
-        return true;
-      }
-    }
-
-    return false;
-  };
-
   useFrame((state, delta) => {
     const camera = state.camera;
     const k = keys.current;
+
+    const boxes = reg.getBoxes();
+    // Both block and wall stop horizontal movement
+    const blockers = boxes.filter(b => b.mode === "block" || b.mode === "wall");
 
     // Horizontal movement (axis-by-axis so we slide along walls)
     camera.getWorldDirection(forward.current);
@@ -115,17 +149,46 @@ export function Controls({
       dz *= step;
 
       const standingY = camera.position.y - eyeHeight;
+      const bodyY = camera.position.y - 0.5;
 
-      tryMove(camera, camera.position.x + dx, camera.position.z, standingY);
-      tryMove(camera, camera.position.x, camera.position.z + dz, standingY);
+      // Group height map: tallest box per object
+      const groupMaxY = new Map<string, number>();
+      for (const b of blockers) {
+        const cur = groupMaxY.get(b.groupId) ?? -Infinity;
+        if (b.aabb.maxY > cur) groupMaxY.set(b.groupId, b.aabb.maxY);
+      }
+
+      // Walls always block. Other blockers block only if too tall to step on
+      const isImpassable = (block: ColliderBox | null): boolean => {
+        if (!block) return false;
+        if (block.mode === "wall") return true;
+        const groupTop = groupMaxY.get(block.groupId) ?? block.aabb.maxY;
+        return (groupTop - standingY) > stepUpHeight;
+      };
+
+      // Try X.
+      const xBlock = findBlockingBox(blockers, camera.position.x + dx, bodyY, camera.position.z);
+      if (!xBlock || !isImpassable(xBlock)) {
+        camera.position.x += dx;
+      }
+      // Try Z.
+      const zBlock = findBlockingBox(blockers, camera.position.x, bodyY, camera.position.z + dz);
+      if (!zBlock || !isImpassable(zBlock)) {
+        camera.position.z += dz;
+      }
     }
 
+    // Push-out — handles diagonal wedges and floating-point creep
+    resolveOverlap(camera, blockers, camera.position.y - 0.5);
+
     // Vertical movement (jump + gravity, with smooth step-up onto objects)
+    // Walls are NOT valid landing surfaces so we exclude them
     verticalVel.current -= gravity * delta;
     const newY = camera.position.y + verticalVel.current * delta;
 
+    const landables = boxes.filter(b => b.mode !== "wall");
     const support = findGroundUnder(
-      boxes,
+      landables,
       camera.position.x,
       camera.position.z,
       camera.position.y,
@@ -136,7 +199,7 @@ export function Controls({
       if (camera.position.y < floor && verticalVel.current <= 0) {
         // Stepping up onto a higher surface, ease the camera up
         const diff = floor - camera.position.y;
-        // 0.12 = roughly 200ms to climb a small rock. Lower = slower.
+        // 0.12 = roughly 200ms to climb a small rock. Lower = slower
         const t = 1 - Math.pow(1 - 0.12, delta * 60);
         if (diff < 0.02) {
           camera.position.y = floor;

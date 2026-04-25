@@ -4,6 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import { Sky } from "@react-three/drei";
 import { Controls } from "./Controls";
 import { SceneRenderer } from "./SceneRenderer";
+import { CollisionProvider } from "@/lib/collisionRegistry";
 import type { SceneJson } from "@/types/scene";
 
 export function Scene({ scene }: { scene: SceneJson }) {
@@ -30,11 +31,15 @@ export function Scene({ scene }: { scene: SceneJson }) {
         shadow-camera-bottom={-30}
       />
 
-      {/* World content (terrain + every object from the JSON) */}
-      <SceneRenderer scene={scene} />
+      {/* Eery object inside reports its bounding box,
+          Controls reads them every frame */}
+      <CollisionProvider>
+        {/* World content (terrain + every object from the JSON) */}
+        <SceneRenderer scene={scene} />
 
-      {/* WASD + mouse-look */}
-      <Controls scene={scene} />
+        {/* WASD + mouse-look */}
+        <Controls scene={scene} />
+      </CollisionProvider>
     </Canvas>
   );
 }
