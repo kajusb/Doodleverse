@@ -28,12 +28,14 @@ RULES:
 4. Use rotation in radians. 0 = along Z. Math.PI/2 ≈ 1.57 = rotated 90°.
 5. Keep scale values between 0.5 and 2.5.
 6. Give the scene a short, evocative name based on its content.
+7. "music" must be a short prompt under 100 words describing background music that fits the scene's mood. Specify genre, instruments, tempo, and atmosphere. NEVER mention real artists, bands, or songs by name. Examples: "calm acoustic guitar with gentle birdsong, peaceful folk ambience, slow tempo, warm and serene" or "haunting orchestral strings with distant choir, slow tempo, mysterious and otherworldly".
 
 OUTPUT SCHEMA:
 {
   "name": string,
   "theme": one of the themes above,
   "terrain": one of the terrains above,
+  "music": string,
   "objects": [
     { "type": <valid type>, "x": number, "z": number, "scale": number?, "rotation": number?, "width": number?, "length": number?, "description": string? }
   ]
@@ -44,6 +46,7 @@ EXAMPLE OUTPUT for a sketch showing a house with two trees and a river:
   "name": "Riverside Cottage",
   "theme": "forest",
   "terrain": "grass",
+  "music": "calm acoustic guitar with soft strings and gentle birdsong, peaceful folk ambience, slow tempo, warm and pastoral",
   "objects": [
     { "type": "house", "x": 0, "z": 0, "scale": 1.2 },
     { "type": "tree", "x": -3, "z": 2 },
