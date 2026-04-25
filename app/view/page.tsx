@@ -1,3 +1,4 @@
+"use no memo";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,25 +11,32 @@ const Scene = dynamic(
   { ssr: false }
 );
 
+type LoadState =
+  | { status: "loading" }
+  | { status: "ready"; scene: SceneJson }
+  | { status: "missing" };
+
 export default function ViewPage() {
   const router = useRouter();
-  const [scene, setScene] = useState<SceneJson | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     const raw = sessionStorage.getItem("doodleverse:scene");
     if (!raw) {
-      setNotFound(true);
+      setState({ status: "missing" });
       return;
     }
     try {
-      setScene(JSON.parse(raw) as SceneJson);
+      const scene = JSON.parse(raw) as SceneJson;
+      setState({ status: "ready", scene });
     } catch {
-      setNotFound(true);
+      setState({ status: "missing" });
     }
   }, []);
 
-  if (notFound) {
+  if (state.status === "loading") return null;
+
+  if (state.status === "missing") {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
         <div className="text-xl mb-3">No generated scene found</div>
@@ -42,11 +50,9 @@ export default function ViewPage() {
     );
   }
 
-  if (!scene) return null;
-
   return (
     <>
-      <Scene scene={scene} />
+      <Scene scene={state.scene} />
       <button
         onClick={() => router.push("/upload")}
         className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition text-sm z-10"
