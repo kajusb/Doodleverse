@@ -1,14 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth0 } from "@/lib/auth0";
 
-export default async function Home() {
-  const session = await auth0.getSession();
-
-  if (session) {
-    redirect("/upload");
-  }
-
+export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800 px-6 py-12 text-white">
       <div className="mx-auto flex min-h-[80vh] max-w-4xl flex-col items-center justify-center gap-8 text-center">

@@ -244,7 +244,7 @@ export default function ViewPage() {
         throw new Error(data.error || `Save failed (${response.status})`);
       }
 
-      setSaveSuccess("World saved to library");
+      setSaveSuccess("world succedfully saved");
       setIsSaved(true);
       sessionStorage.removeItem("doodleverse:generationDraft");
     } catch (error) {
