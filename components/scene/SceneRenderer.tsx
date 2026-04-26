@@ -7,6 +7,9 @@ import { HeroAsset } from "@/components/objects/HeroAsset";
 export const HERO_INDEX = -1;
 
 export function SceneRenderer({ scene }: { scene: SceneJson }) {
+  // Guard against old scenes that don't have an objects[] array
+  const objects = scene.objects ?? [];
+
   return (
     <>
       <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
@@ -28,7 +31,7 @@ export function SceneRenderer({ scene }: { scene: SceneJson }) {
         />
       )}
 
-      {scene.objects.map((obj, i) => {
+      {objects.map((obj, i) => {
         if (!obj.glbUrl) return null;
         return (
           <HeroAsset

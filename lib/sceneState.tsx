@@ -1,13 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
-import type { SceneJson } from "@/types/scene";
+import { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from "react";
+import type { SceneJson, SceneObject } from "@/types/scene";
 
 interface SceneStateContextValue {
   scene: SceneJson;
   updateScene: (updates: Partial<SceneJson>) => void;
-  addObject: (obj: SceneJson["objects"][number]) => void;
-  updateObject: (index: number, updates: Partial<SceneJson["objects"][number]>) => void;
+  addObject: (obj: SceneObject) => void;
+  updateObject: (index: number, updates: Partial<SceneObject>) => void;
   removeObject: (index: number) => void;
   editMode: boolean;
   setEditMode: (v: boolean) => void;
@@ -15,9 +15,9 @@ interface SceneStateContextValue {
   setSelectedObjectIndex: (i: number | null) => void;
   isDragging: boolean;
   setIsDragging: (v: boolean) => void;
-  // Music URL (data URL) — null if no music. Updated on regenerate.
   musicUrl: string | null;
   setMusicUrl: (url: string | null) => void;
+  copiedObjectRef: React.MutableRefObject<SceneObject | null>;
 }
 
 const SceneStateContext = createContext<SceneStateContextValue | null>(null);
@@ -36,12 +36,12 @@ export function SceneStateProvider({
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [musicUrl, setMusicUrl] = useState<string | null>(initialMusicUrl ?? null);
+  const copiedObjectRef = useRef<SceneObject | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
   }, [scene]);
 
-  // Save music to sessionStorage whenever it changes
   useEffect(() => {
     if (musicUrl) {
       sessionStorage.setItem("doodleverse:music", musicUrl);
@@ -54,15 +54,15 @@ export function SceneStateProvider({
     setScene((prev) => ({ ...prev, ...updates }));
   }, []);
 
-  const addObject = useCallback((obj: SceneJson["objects"][number]) => {
-    setScene((prev) => ({ ...prev, objects: [...prev.objects, obj] }));
+  const addObject = useCallback((obj: SceneObject) => {
+    setScene((prev) => ({ ...prev, objects: [...(prev.objects ?? []), obj] }));
   }, []);
 
   const updateObject = useCallback(
-    (index: number, updates: Partial<SceneJson["objects"][number]>) => {
+    (index: number, updates: Partial<SceneObject>) => {
       setScene((prev) => ({
         ...prev,
-        objects: prev.objects.map((o, i) => (i === index ? { ...o, ...updates } : o)),
+        objects: (prev.objects ?? []).map((o, i) => (i === index ? { ...o, ...updates } : o)),
       }));
     },
     []
@@ -71,7 +71,7 @@ export function SceneStateProvider({
   const removeObject = useCallback((index: number) => {
     setScene((prev) => ({
       ...prev,
-      objects: prev.objects.filter((_, i) => i !== index),
+      objects: (prev.objects ?? []).filter((_, i) => i !== index),
     }));
   }, []);
 
@@ -91,6 +91,7 @@ export function SceneStateProvider({
         setIsDragging,
         musicUrl,
         setMusicUrl,
+        copiedObjectRef,
       }}
     >
       {children}

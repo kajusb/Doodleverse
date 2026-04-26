@@ -2,35 +2,83 @@
 
 import { useState } from "react";
 import { useSceneState } from "@/lib/sceneState";
+import type { SceneObject } from "@/types/scene";
 
 const SCALE_MIN = 0.25;
 const SCALE_MAX = 4.0;
 const SCALE_STEP = 0.05;
 
 export function SelectedObjectPanel() {
-  const { scene, selectedObjectIndex, setSelectedObjectIndex, updateScene, updateObject } = useSceneState();
+  const {
+    scene,
+    selectedObjectIndex,
+    setSelectedObjectIndex,
+    updateScene,
+    updateObject,
+    addObject,
+    removeObject,
+  } = useSceneState();
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (selectedObjectIndex === null) return null;
 
-  // Hero uses index -1 (sentinel). Other objects use their array index.
   const isSingleHero = selectedObjectIndex === -1 && !!scene.heroAssetUrl;
-  const obj = isSingleHero ? null : scene.objects[selectedObjectIndex];
+  const obj = isSingleHero ? null : (scene.objects ?? [])[selectedObjectIndex];
   const objectName = isSingleHero ? scene.name : (obj?.description || obj?.type || "Object");
 
-  // Current scale value (defaults to 1 if not set)
   const currentScale = isSingleHero
     ? (scene.heroScale ?? 1)
     : (obj?.scale ?? 1);
 
-  // Apply a new scale value to the right place in scene state
   const setScale = (newScale: number) => {
     if (isSingleHero) {
       updateScene({ heroScale: newScale });
     } else {
       updateObject(selectedObjectIndex, { scale: newScale });
     }
+  };
+
+  // Duplicate the selected object — adds an exact copy at the same position.
+  // The new copy is selected so the user can immediately drag it apart.
+  const handleDuplicate = () => {
+    let toCopy: SceneObject | null = null;
+    if (isSingleHero) {
+      toCopy = {
+        type: "house",
+        x: scene.heroX ?? 0,
+        y: scene.heroY ?? 0,
+        z: scene.heroZ ?? 0,
+        rotation: scene.heroRotation ?? 0,
+        scale: scene.heroScale ?? 1,
+        glbUrl: scene.heroAssetUrl,
+      };
+    } else if (obj) {
+      toCopy = { ...obj };
+    }
+    if (!toCopy) return;
+
+    // Spawn at the SAME position as the original (no offset).
+    addObject({ ...toCopy });
+    const newIndex = (scene.objects ?? []).length;
+    setSelectedObjectIndex(newIndex);
+  };
+
+  // Delete the selected object. For the hero, clears heroAssetUrl.
+  const handleDelete = () => {
+    if (isSingleHero) {
+      updateScene({
+        heroAssetUrl: undefined,
+        heroX: 0,
+        heroY: 0,
+        heroZ: 0,
+        heroRotation: 0,
+        heroScale: 1,
+      });
+    } else {
+      removeObject(selectedObjectIndex);
+    }
+    setSelectedObjectIndex(null);
   };
 
   const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
@@ -104,11 +152,16 @@ export function SelectedObjectPanel() {
         </div>
         <div>
           <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">R</kbd>{" "}
-          to rotate
+          rotate ·{" "}
+          <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">⌘C</kbd>/
+          <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">⌘V</kbd>{" "}
+          copy/paste
         </div>
         <div>
+          <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">Del</kbd>{" "}
+          delete ·{" "}
           <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">Esc</kbd>{" "}
-          to deselect
+          deselect
         </div>
       </div>
 
@@ -151,19 +204,40 @@ export function SelectedObjectPanel() {
         </div>
       )}
 
+      {/* Action buttons — Duplicate + Regenerate side by side */}
+      <div className="flex gap-2 mb-2">
+        <button
+          onClick={handleDuplicate}
+          disabled={isRegenerating}
+          className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1"
+          title="Duplicate (or ⌘C then ⌘V)"
+        >
+          📋 Duplicate
+        </button>
+        <button
+          onClick={handleRegenerate}
+          disabled={isRegenerating}
+          className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1"
+        >
+          {isRegenerating ? (
+            <>
+              <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Regen…
+            </>
+          ) : (
+            <>🔄 Regenerate</>
+          )}
+        </button>
+      </div>
+
+      {/* Delete button — full width, danger color */}
       <button
-        onClick={handleRegenerate}
+        onClick={handleDelete}
         disabled={isRegenerating}
-        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
+        className="w-full px-3 py-2 bg-red-700/80 hover:bg-red-600 disabled:bg-red-900 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1"
+        title="Delete (or Del key)"
       >
-        {isRegenerating ? (
-          <>
-            <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Regenerating... (~60s)
-          </>
-        ) : (
-          <>🔄 Regenerate model</>
-        )}
+        🗑 Delete
       </button>
 
       {isRegenerating && (

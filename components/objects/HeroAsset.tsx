@@ -28,7 +28,6 @@ export function HeroAsset({ obj, url, index }: Props) {
 
 interface FitTransform {
   scale: number;
-  // World-meters dimensions of the model AFTER scaling
   worldSizeX: number;
   worldSizeY: number;
   worldSizeZ: number;
@@ -38,113 +37,108 @@ function HeroAssetInner({ obj, url, index }: Props) {
   const { scene: originalScene } = useGLTF(url);
   const { selectedObjectIndex, setSelectedObjectIndex } = useSceneState();
 
-  // Clone AND immediately re-center the scene so its bounding box is at origin.
-  // This eliminates any TRELLIS quirk where the model's geometry is offset
-  // from its scene root (some models come back with center at (5.99, 0, 0)).
-  const clonedScene = useMemo(() => {
-    if (!originalScene) return null;
+  // Clone scene + clone materials so this instance is independent.
+  const { clonedScene, baseSize } = useMemo(() => {
+    if (!originalScene) return { clonedScene: null, baseSize: null };
+
     const cloned = SkeletonUtils.clone(originalScene);
-    // Compute the bounding box of the cloned scene's meshes
+
+    cloned.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map((m) => m.clone());
+        } else if (child.material) {
+          child.material = child.material.clone();
+        }
+      }
+    });
+
     cloned.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(cloned);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    // Shift each top-level child by -center so the whole model is centered at origin.
-    // We shift CHILDREN (not the root) because the root needs to stay at (0,0,0)
-    // for our outer group's position/scale to behave predictably.
+
     cloned.children.forEach((child) => {
       child.position.x -= center.x;
-      // Move bottom of model to y=0 instead of centering Y (we want it on the ground)
       child.position.y -= box.min.y;
       child.position.z -= center.z;
     });
     cloned.updateMatrixWorld(true);
-    return cloned;
-  }, [originalScene]);
 
-  const objY = obj.y ?? 0;
-  const objType = obj.type;
+    const sizeBox = new THREE.Box3().setFromObject(cloned);
+    const sz = new THREE.Vector3();
+    sizeBox.getSize(sz);
+
+    return { clonedScene: cloned, baseSize: sz };
+  }, [originalScene]);
 
   const [fit, setFit] = useState<FitTransform | null>(null);
   const [isHovering, setIsHovering] = useState(false);
-  const originalMaterials = useRef<Map<THREE.Mesh, THREE.Material | THREE.Material[]>>(new Map());
 
+  // One-time setup: shadows, material props
   useEffect(() => {
-    if (!clonedScene) return;
-
-    console.log("HeroAsset cloned scene (after recentering):", {
-      url,
-      childCount: clonedScene.children.length,
-    });
+    if (!clonedScene || !baseSize) return;
 
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
         child.receiveShadow = true;
 
-        const mat = child.material;
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.roughness = Math.min(mat.roughness, 0.7);
-          mat.metalness = 0;
-          mat.needsUpdate = true;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial) {
+            mat.roughness = Math.min(mat.roughness, 0.7);
+            mat.metalness = 0;
+            mat.needsUpdate = true;
+          }
         }
-        originalMaterials.current.set(child, child.material);
       }
     });
 
-    // After re-centering, the bounding box is now centered horizontally and
-    // sits on Y=0. Compute size for scaling.
-    clonedScene.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(clonedScene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-
-    const maxDim = Math.max(size.x, size.y, size.z);
+    const maxDim = Math.max(baseSize.x, baseSize.y, baseSize.z);
     if (maxDim === 0 || !isFinite(maxDim)) return;
 
     const scale = TARGET_SIZE / maxDim;
 
-    console.log("HeroAsset fit:", {
-      url,
-      size: size.toArray(),
-      scale,
-    });
-
     setFit({
       scale,
-      worldSizeX: size.x * scale,
-      worldSizeY: size.y * scale,
-      worldSizeZ: size.z * scale,
+      worldSizeX: baseSize.x * scale,
+      worldSizeY: baseSize.y * scale,
+      worldSizeZ: baseSize.z * scale,
     });
-  }, [clonedScene, objType, objY, url]);
+  }, [clonedScene, baseSize]);
 
-  // Apply green tint when hovering or selected
+  // Apply hover/select tint by directly modifying emissive on each material.
+  // No swapping, no cloning at runtime — just set/clear emissive in place.
   useEffect(() => {
     if (!clonedScene) return;
     const isSelected = selectedObjectIndex === index;
     const showTint = isHovering || isSelected;
 
+    const tintColor = isSelected ? new THREE.Color("#22dd55") : new THREE.Color("#88ff99");
+    const tintIntensity = isSelected ? 0.4 : 0.25;
+    const blackColor = new THREE.Color(0, 0, 0);
+
     clonedScene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
-      const original = originalMaterials.current.get(child);
-      if (!original) return;
-
-      if (showTint) {
-        const orig = Array.isArray(original) ? original[0] : original;
-        if (orig instanceof THREE.MeshStandardMaterial) {
-          const tinted = orig.clone();
-          tinted.emissive = new THREE.Color(isSelected ? "#22dd55" : "#88ff99");
-          tinted.emissiveIntensity = isSelected ? 0.4 : 0.25;
-          child.material = tinted;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of mats) {
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          if (showTint) {
+            mat.emissive.copy(tintColor);
+            mat.emissiveIntensity = tintIntensity;
+          } else {
+            mat.emissive.copy(blackColor);
+            mat.emissiveIntensity = 0;
+          }
+          mat.needsUpdate = true;
         }
-      } else {
-        child.material = original;
       }
     });
   }, [clonedScene, isHovering, selectedObjectIndex, index]);
 
   const groupRef = useRef<THREE.Group>(null);
-  useCollider(groupRef, "wall", [fit, obj.x, obj.y, obj.z, obj.rotation]);
+  useCollider(groupRef, "wall", [fit, obj.x, obj.y, obj.z, obj.rotation, obj.scale]);
 
   if (!clonedScene) return null;
 
@@ -168,9 +162,6 @@ function HeroAssetInner({ obj, url, index }: Props) {
     document.body.style.cursor = "";
   };
 
-  // The arrows pivot around the model's center. Since we re-centered the
-  // mesh at origin (and base at y=0), the center is at (0, halfHeight, 0)
-  // in LOCAL units (inside the inner scaled group).
   const arrowsFit = fit ? {
     scale: fit.scale,
     offsetX: 0,
@@ -196,7 +187,6 @@ function HeroAssetInner({ obj, url, index }: Props) {
     >
       <group scale={fit?.scale ?? 1}>
         <primitive object={clonedScene} />
-
         {arrowsFit && isSelected && <ObjectArrows fit={arrowsFit} index={index} />}
       </group>
     </group>

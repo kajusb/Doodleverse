@@ -8,6 +8,7 @@ import { SceneStateProvider, useSceneState } from "@/lib/sceneState";
 import { EditorPanel } from "@/components/editor/EditorPanel";
 import { SelectedObjectPanel } from "@/components/editor/SelectedObjectPanel";
 import { AddObjectButton } from "@/components/editor/AddObjectButton";
+import { CopyPasteHandler } from "@/components/editor/CopyPasteHandler";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
@@ -70,8 +71,8 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
 
-  // Whenever musicUrl changes (initial load OR regenerate), decode and play.
-  // Uses Web Audio API's BufferSource with loop=true for gapless playback.
+  // Whenever musicUrl changes, decode and play. Handles initial load AND
+  // live regenerate from the editor panel.
   useEffect(() => {
     if (!musicUrl) {
       try { sourceRef.current?.stop(); } catch { /* already stopped */ }
@@ -83,9 +84,6 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
 
     const setupAudio = async () => {
       try {
-        console.log("Music: starting setup");
-
-        // Create or reuse the AudioContext
         let ctx = audioCtxRef.current;
         if (!ctx) {
           const Ctx =
@@ -93,35 +91,25 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
             (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
           ctx = new Ctx();
           audioCtxRef.current = ctx;
-          console.log("Music: created AudioContext, initial state =", ctx.state);
         }
 
-        // Fetch the audio bytes
         const res = await fetch(musicUrl);
         if (!res.ok) throw new Error(`Failed to fetch music: ${res.status}`);
         const arrayBuf = await res.arrayBuffer();
-        console.log("Music: fetched", arrayBuf.byteLength, "bytes");
 
-        // Decode (slice to avoid mutation issues with re-decoding)
+        // Slice to avoid mutation issues with re-decoding
         const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
-        console.log("Music: decoded, duration =", audioBuf.duration.toFixed(2), "s");
-
         if (cancelled) return;
 
         // Stop the previous source BEFORE starting the new one
         try { sourceRef.current?.stop(); } catch { /* already stopped */ }
 
-        // Build the source. Web Audio's loop=true is sample-accurate gapless —
-        // there's no extra latency between loop end and loop start.
         const source = ctx.createBufferSource();
         source.buffer = audioBuf;
         source.loop = true;
-        // Loop the entire buffer. No trimming — let the original audio repeat as-is.
-        // (If you hear a click at the loop point, change loopStart/End.)
         source.loopStart = 0;
         source.loopEnd = audioBuf.duration;
 
-        // Reuse / create gain node (volume)
         let gain = gainRef.current;
         if (!gain) {
           gain = ctx.createGain();
@@ -133,18 +121,12 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
         source.connect(gain);
         source.start();
         sourceRef.current = source;
-        console.log("Music: source started, looping enabled");
 
-        // If the audio context is suspended (browser autoplay policy), we
-        // need a user gesture to resume. Listen for any input.
         if (ctx.state === "suspended") {
-          console.log("Music: context suspended, awaiting user gesture");
           setNeedsClickToPlay(true);
-
           const resume = async () => {
             try {
               await ctx!.resume();
-              console.log("Music: context resumed, state =", ctx!.state);
               if (ctx!.state === "running") {
                 setNeedsClickToPlay(false);
                 window.removeEventListener("click", resume);
@@ -173,7 +155,7 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
     };
   }, [musicUrl]);
 
-  // Cleanup the audio context on unmount
+  // Cleanup audio context on unmount
   useEffect(() => {
     return () => {
       try { sourceRef.current?.stop(); } catch { /* already stopped */ }
@@ -187,6 +169,9 @@ function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
   return (
     <>
       <Scene scene={scene} />
+
+      {/* Headless: listens for ⌘C / ⌘V to copy/paste the selected object */}
+      <CopyPasteHandler />
 
       <button
         onClick={onNewSketch}
