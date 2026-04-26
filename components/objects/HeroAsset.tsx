@@ -4,18 +4,18 @@ import { useRef, useEffect, useMemo, useState, Suspense } from "react";
 import { useGLTF } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import * as THREE from "three";
-import type { SceneObject } from "@/types/scene";
 import { useCollider } from "@/lib/useCollider";
 
 interface Props {
-  obj: SceneObject;
   url: string;
 }
 
-export function HeroAsset({ obj, url }: Props) {
+const TARGET_SIZE = 12;
+
+export function HeroAsset({ url }: Props) {
   return (
     <Suspense fallback={null}>
-      <HeroAssetInner obj={obj} url={url} />
+      <HeroAssetInner url={url} />
     </Suspense>
   );
 }
@@ -27,38 +27,38 @@ interface FitTransform {
   offsetZ: number;
 }
 
-function HeroAssetInner({ obj, url }: Props) {
+function HeroAssetInner({ url }: Props) {
   const { scene: originalScene } = useGLTF(url);
 
-  // Clone the cached scene so we have our own instance.
   const clonedScene = useMemo(() => {
     if (!originalScene) return null;
     return SkeletonUtils.clone(originalScene);
   }, [originalScene]);
 
-  // Compute auto-fit transform once when the clone is ready. We apply this to
-  // a wrapper <group> rather than mutating the scene directly — this keeps
-  // React Compiler happy and is a cleaner pattern anyway.
   const [fit, setFit] = useState<FitTransform | null>(null);
 
   useEffect(() => {
     if (!clonedScene) return;
 
-    // Enable shadows on every mesh inside the GLB. This is OK to do here
-    // because castShadow/receiveShadow are runtime-only flags, not part of
-    // React's tracked state.
+    // Tweak materials so TRELLIS's PBR surfaces respond well to scene lights.
+    // Lower roughness = brighter highlights. Kill metalness (looks bad without
+    // an environment map). NO emissive — that flattens colors.
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
         child.receiveShadow = true;
-        if (child.material instanceof THREE.Material) {
-          child.material.precision = "lowp";
+
+        const mat = child.material;
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          mat.roughness = Math.min(mat.roughness, 0.8);
+          mat.metalness = 0;
+          mat.needsUpdate = true;
         }
       }
     });
 
-    // Measure to compute auto-fit
-    const box = new THREE.Box3().setFromObject(clonedScene);
+    // Compute tight bounding box from VISIBLE meshes only
+    const box = computeMeshOnlyBox(clonedScene);
     const size = new THREE.Vector3();
     box.getSize(size);
 
@@ -68,16 +68,20 @@ function HeroAssetInner({ obj, url }: Props) {
       return;
     }
 
-    // Scale so model is ~2.5m tall (roughly the size of a primitive house)
-    const targetHeight = 2.5;
-    const scale = size.y > 0 ? targetHeight / size.y : 1;
+    const scale = TARGET_SIZE / maxDim;
 
-    // After scaling, recenter horizontally and rest on the ground (y=0)
     const center = new THREE.Vector3();
     box.getCenter(center);
     const offsetX = -center.x * scale;
     const offsetZ = -center.z * scale;
-    const offsetY = -box.min.y * scale;
+    const offsetY = -box.min.y * scale - 0.05;
+
+    console.log("HeroAsset fit:", {
+      originalSize: [size.x, size.y, size.z],
+      maxDim,
+      scale,
+      offsetY,
+    });
 
     setFit({ scale, offsetX, offsetY, offsetZ });
   }, [clonedScene]);
@@ -87,16 +91,8 @@ function HeroAssetInner({ obj, url }: Props) {
 
   if (!clonedScene) return null;
 
-  const userScale = obj.scale ?? 1;
-
   return (
-    <group
-      ref={groupRef}
-      position={[obj.x, obj.y ?? 0, obj.z]}
-      rotation={[0, obj.rotation ?? 0, 0]}
-      scale={userScale}
-    >
-      {/* Inner group applies the auto-fit transform without touching the cached scene */}
+    <group ref={groupRef} position={[0, 0, 0]}>
       <group
         position={fit ? [fit.offsetX, fit.offsetY, fit.offsetZ] : [0, 0, 0]}
         scale={fit?.scale ?? 1}
@@ -105,4 +101,29 @@ function HeroAssetInner({ obj, url }: Props) {
       </group>
     </group>
   );
+}
+
+function computeMeshOnlyBox(root: THREE.Object3D): THREE.Box3 {
+  const box = new THREE.Box3();
+  let foundMesh = false;
+
+  root.updateWorldMatrix(true, true);
+
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.geometry) {
+      const meshBox = new THREE.Box3().setFromObject(child);
+      if (foundMesh) {
+        box.union(meshBox);
+      } else {
+        box.copy(meshBox);
+        foundMesh = true;
+      }
+    }
+  });
+
+  if (!foundMesh) {
+    box.setFromObject(root);
+  }
+
+  return box;
 }

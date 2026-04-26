@@ -10,12 +10,12 @@ import type { SceneJson, FogDensity } from "@/types/scene";
 const DEFAULT_SUN: [number, number, number] = [0.3, 1, 0.3];
 
 // Maps the AI's fog category to actual exponential density values.
-// Tuned for visible-but-not-overwhelming fog at our scene scale
+// Tuned LOW so distant atmosphere reads as subtle haze, not white-out.
 const FOG_DENSITY_MAP: Record<FogDensity, number> = {
   none: 0,
-  light: 0.012,    // subtle atmospheric haze, default
-  medium: 0.025,   // visible mist in middle distance, moody
-  heavy: 0.05,     // clearly fogged scene, mysterious / spooky
+  light: 0.004,    // very subtle, mostly invisible up close
+  medium: 0.010,   // visible mid-distance
+  heavy: 0.020,    // clearly fogged but model stays readable
 };
 
 export function Scene({ scene }: { scene: SceneJson }) {
@@ -27,7 +27,6 @@ export function Scene({ scene }: { scene: SceneJson }) {
     sun[2] * sunDistance,
   ];
 
-  // Pick fog values from AI hints
   const fogColor = scene.fogColor ?? "#b8d8f0";
   const fogDensityKey: FogDensity = scene.fogDensity ?? "light";
   const fogDensity = FOG_DENSITY_MAP[fogDensityKey];
@@ -46,26 +45,34 @@ export function Scene({ scene }: { scene: SceneJson }) {
       ) : (
         <Sky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
       )}
-      {/* Exponential fog. Density 0 means no fog at all (just don't render it). */}
       {fogDensity > 0 && (
         <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
       )}
 
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
+      {/* Lighting — bright but balanced, designed to render TRELLIS materials
+          well without washing out colors. */}
+      <ambientLight intensity={1.2} />
+      <hemisphereLight
+        args={[scene.skyColor ?? "#ffffff", scene.groundColor ?? "#888888", 0.6]}
+      />
       <directionalLight
         position={sunWorldPos}
-        intensity={1.2}
+        intensity={1.8}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}
         shadow-camera-bottom={-30}
+        shadow-bias={-0.0005}
+      />
+      {/* Soft fill from opposite the sun */}
+      <directionalLight
+        position={[-sunWorldPos[0], sunWorldPos[1] * 0.5, -sunWorldPos[2]]}
+        intensity={0.5}
       />
 
-      {/* Collision registry */}
       <CollisionProvider>
         <SceneRenderer scene={scene} />
         <Controls scene={scene} />

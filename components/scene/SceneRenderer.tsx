@@ -11,10 +11,6 @@ import { Water } from "@/components/objects/Water";
 import { Terrain } from "@/components/scene/Terrain";
 import { HeroAsset } from "@/components/objects/HeroAsset";
 
-// TEMP: while testing TRELLIS, set this to true to skip rendering primitives
-// and only show the terrain + the AI-generated hero asset.
-const HERO_ONLY_DEBUG = true;
-
 function renderObject(obj: SceneObject, key: number) {
   switch (obj.type) {
     case "tree": return <Tree key={key} obj={obj} />;
@@ -30,62 +26,24 @@ function renderObject(obj: SceneObject, key: number) {
   }
 }
 
-function pickHeroIndex(objs: SceneObject[]): number {
-  const isLinework = (t: SceneObject["type"]) =>
-    t === "river" || t === "path";
-
-  let best = -1;
-  let bestDist = Infinity;
-  objs.forEach((o, i) => {
-    if (isLinework(o.type)) return;
-    const d = Math.hypot(o.x, o.z);
-    if (d < bestDist) { bestDist = d; best = i; }
-  });
-  if (best !== -1) return best;
-
-  bestDist = Infinity;
-  objs.forEach((o, i) => {
-    const d = Math.hypot(o.x, o.z);
-    if (d < bestDist) { bestDist = d; best = i; }
-  });
-  return best;
-}
-
 export function SceneRenderer({ scene }: { scene: SceneJson }) {
-  const heroIdx = scene.heroAssetUrl ? pickHeroIndex(scene.objects) : -1;
-
-  // === LOUD DEBUG LOGGING ===
-  console.log("=== SceneRenderer ===");
-  console.log("HERO_ONLY_DEBUG:", HERO_ONLY_DEBUG);
-  console.log("scene.heroAssetUrl:", scene.heroAssetUrl);
-  console.log("scene.objects.length:", scene.objects.length);
-  console.log("heroIdx:", heroIdx);
-  console.log("hero object:", heroIdx !== -1 ? scene.objects[heroIdx] : "NONE");
-  console.log("scene.terrain:", scene.terrain);
-  console.log("scene.groundColor:", scene.groundColor);
-  // ==========================
-
-  if (HERO_ONLY_DEBUG) {
-    const heroObj = heroIdx !== -1 ? scene.objects[heroIdx] : null;
+  // If we have an AI-generated hero asset, the model IS the scene.
+  // Skip all primitives — just render the terrain and the GLB at origin.
+  if (scene.heroAssetUrl) {
     return (
       <>
         <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
-        {heroObj && scene.heroAssetUrl && (
-          <HeroAsset obj={heroObj} url={scene.heroAssetUrl} />
-        )}
+        <HeroAsset url={scene.heroAssetUrl} />
       </>
     );
   }
 
+  // Otherwise (no hero generated, e.g. user didn't enable the checkbox or
+  // it failed), render the primitive scene from Gemma's object list.
   return (
     <>
       <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
-      {scene.objects.map((obj, i) => {
-        if (i === heroIdx && scene.heroAssetUrl) {
-          return <HeroAsset key={i} obj={obj} url={scene.heroAssetUrl} />;
-        }
-        return renderObject(obj, i);
-      })}
+      {scene.objects.map((obj, i) => renderObject(obj, i))}
     </>
   );
 }
