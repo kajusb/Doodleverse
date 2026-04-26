@@ -125,17 +125,20 @@ function MagicalClouds() {
   );
 }
 
-// Heavy dark clouds for stormy weather
+// Heavy dark clouds + gentle drizzle for stormy weather
 function StormClouds() {
   return (
-    <Clouds material={THREE.MeshBasicMaterial}>
-      <Cloud seed={1} segments={35} bounds={[120, 8, 120]} volume={50}
-        color="#3a4050" opacity={0.85} position={[0, 30, 0]} />
-      <Cloud seed={2} segments={30} bounds={[80, 6, 80]} volume={35}
-        color="#2a3040" opacity={0.8} position={[20, 28, -15]} />
-      <Cloud seed={3} segments={30} bounds={[80, 6, 80]} volume={35}
-        color="#2a3040" opacity={0.8} position={[-25, 25, 20]} />
-    </Clouds>
+    <>
+      <Clouds material={THREE.MeshBasicMaterial}>
+        <Cloud seed={1} segments={35} bounds={[120, 8, 120]} volume={50}
+          color="#3a4050" opacity={0.85} position={[0, 30, 0]} />
+        <Cloud seed={2} segments={30} bounds={[80, 6, 80]} volume={35}
+          color="#2a3040" opacity={0.8} position={[20, 28, -15]} />
+        <Cloud seed={3} segments={30} bounds={[80, 6, 80]} volume={35}
+          color="#2a3040" opacity={0.8} position={[-25, 25, 20]} />
+      </Clouds>
+      <Rainfall />
+    </>
   );
 }
 
@@ -198,6 +201,55 @@ function Snowfall() {
         color="white"
         transparent
         opacity={0.8}
+        sizeAttenuation
+      />
+    </points>
+  );
+}
+
+// Falling rain — gentle drizzle, not a downpour
+function Rainfall() {
+  const ref = useRef<THREE.Points>(null);
+  const COUNT = 500;
+
+  const { positionAttr, velocities } = useMemo(() => {
+    const positions = new Float32Array(COUNT * 3);
+    const velocities = new Float32Array(COUNT);
+    for (let i = 0; i < COUNT; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 80;
+      positions[i * 3 + 1] = Math.random() * 40;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
+      // Slower fall — softer feel
+      velocities[i] = 0.6 + Math.random() * 0.4;
+    }
+    const positionAttr = new THREE.BufferAttribute(positions, 3);
+    return { positionAttr, velocities };
+  }, []);
+
+  useFrame((_, delta) => {
+    if (!ref.current) return;
+    const geom = ref.current.geometry;
+    const pos = geom.attributes.position.array as Float32Array;
+    for (let i = 0; i < COUNT; i++) {
+      pos[i * 3 + 1] -= velocities[i] * delta * 60;
+      // Subtle slant
+      pos[i * 3] += velocities[i] * delta * 2;
+      if (pos[i * 3 + 1] < 0) {
+        pos[i * 3 + 1] = 40;
+        pos[i * 3] = (Math.random() - 0.5) * 80;
+      }
+    }
+    geom.attributes.position.needsUpdate = true;
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry attach="geometry" attributes-position={positionAttr} />
+      <pointsMaterial
+        size={0.15}
+        color="#a0b0c0"
+        transparent
+        opacity={0.35}
         sizeAttenuation
       />
     </points>

@@ -1,16 +1,8 @@
 "use client";
 
 import { useSceneState } from "@/lib/sceneState";
-import type { Theme, FogDensity } from "@/types/scene";
+import type { FogDensity } from "@/types/scene";
 import { useState } from "react";
-
-const THEMES: { id: Theme; name: string; preview: string }[] = [
-  { id: "forest", name: "Forest", preview: "#2d5a3d" },
-  { id: "desert", name: "Desert", preview: "#d4a874" },
-  { id: "snow", name: "Snow", preview: "#e0e8f0" },
-  { id: "meadow", name: "Meadow", preview: "#6aa84f" },
-  { id: "fantasy", name: "Fantasy", preview: "#a070d0" },
-];
 
 const MOOD_PRESETS: {
   id: string;
@@ -51,7 +43,6 @@ export function EditorPanel() {
       <button
         onClick={() => {
           setOpen((v) => !v);
-          // Auto-enable edit mode when opening
           if (!open) setEditMode(true);
         }}
         className="fixed left-4 top-1/2 -translate-y-1/2 z-[100] bg-slate-800/95 hover:bg-slate-700 text-white px-4 py-3 rounded-lg backdrop-blur-sm border border-slate-600 transition shadow-2xl font-semibold"
@@ -94,22 +85,6 @@ export function EditorPanel() {
             </div>
           </div>
 
-          {/* Theme */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Theme</label>
-            <select
-              value={scene.theme}
-              onChange={(e) => updateScene({ theme: e.target.value as Theme })}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-            >
-              {THEMES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Sky color */}
           <div>
             <label className="block text-sm font-semibold mb-2">Sky color</label>
@@ -146,60 +121,6 @@ export function EditorPanel() {
                 className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
               />
             </div>
-          </div>
-
-          {/* Fog density */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Fog density</label>
-            <select
-              value={scene.fogDensity ?? "light"}
-              onChange={(e) => updateScene({ fogDensity: e.target.value as FogDensity })}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-            >
-              <option value="none">None</option>
-              <option value="light">Light</option>
-              <option value="medium">Medium</option>
-              <option value="heavy">Heavy</option>
-            </select>
-          </div>
-
-          {/* Fog color */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Fog color</label>
-            <div className="flex gap-2 items-center">
-              <input
-                type="color"
-                value={scene.fogColor ?? "#b8d8f0"}
-                onChange={(e) => updateScene({ fogColor: e.target.value })}
-                className="w-12 h-10 rounded cursor-pointer border border-slate-700"
-              />
-              <input
-                type="text"
-                value={scene.fogColor ?? "#b8d8f0"}
-                onChange={(e) => updateScene({ fogColor: e.target.value })}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Sun height */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Sun height ({((scene.sunPosition?.[1] ?? 1) * 100).toFixed(0)}%)
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.05"
-              value={scene.sunPosition?.[1] ?? 1}
-              onChange={(e) => {
-                const y = parseFloat(e.target.value);
-                const cur = scene.sunPosition ?? [0.3, 1, 0.3];
-                updateScene({ sunPosition: [cur[0], y, cur[2]] });
-              }}
-              className="w-full"
-            />
           </div>
         </div>
       </div>
