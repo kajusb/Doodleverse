@@ -7,6 +7,7 @@ import type { SceneJson } from "@/types/scene";
 import { SceneStateProvider, useSceneState } from "@/lib/sceneState";
 import { EditorPanel } from "@/components/editor/EditorPanel";
 import { SelectedObjectPanel } from "@/components/editor/SelectedObjectPanel";
+import { AddObjectButton } from "@/components/editor/AddObjectButton";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
@@ -23,7 +24,6 @@ export default function ViewPage() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [needsClickToPlay, setNeedsClickToPlay] = useState(false);
 
-  // Web Audio API refs — gives us a gapless loop unlike <audio>
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -68,7 +68,6 @@ export default function ViewPage() {
         const source = ctx.createBufferSource();
         source.buffer = audioBuf;
         source.loop = true;
-        // Trim the encoder padding off the loop boundaries (~10ms each side)
         source.loopStart = 0.25;
         source.loopEnd = audioBuf.duration - 0.25;
 
@@ -129,8 +128,6 @@ export default function ViewPage() {
     );
   }
 
-  // Wrap the rendered world in the scene state provider so the editor panel
-  // and other UI can read/update it live.
   return (
     <SceneStateProvider initialScene={state.scene}>
       <ViewContent
@@ -141,8 +138,6 @@ export default function ViewPage() {
   );
 }
 
-// Inner component that lives INSIDE the provider — it reads the live scene
-// (with any edits applied) and passes it to <Scene>.
 function ViewContent({
   needsClickToPlay,
   onNewSketch,
@@ -162,6 +157,8 @@ function ViewContent({
       >
         ← New sketch
       </button>
+
+      <AddObjectButton />
 
       <EditorPanel />
       <SelectedObjectPanel />

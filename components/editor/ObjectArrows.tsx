@@ -53,7 +53,7 @@ interface DragState {
 export function ObjectArrows({ fit, index }: Props) {
   const { camera, gl } = useThree();
   const { scene, updateObject, updateScene, setSelectedObjectIndex } = useSceneState();
-  const isSingleHero = !!scene.heroAssetUrl;
+  const isSingleHero = index === -1 && !!scene.heroAssetUrl;
 
   const dragState = useRef<DragState | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);

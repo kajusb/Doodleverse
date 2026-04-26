@@ -10,7 +10,7 @@ export function SelectedObjectPanel() {
 
   if (selectedObjectIndex === null) return null;
 
-  const isSingleHero = !!scene.heroAssetUrl;
+  const isSingleHero = selectedObjectIndex === -1 && !!scene.heroAssetUrl;
   const obj = isSingleHero ? null : scene.objects[selectedObjectIndex];
   const objectName = isSingleHero ? scene.name : (obj?.description || obj?.type || "Object");
 
