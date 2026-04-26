@@ -31,9 +31,15 @@ export interface SceneJson {
   objects: SceneObject[];
   size?: number;
   music?: string;
+  // Atmosphere overrides — Gemma sets these based on the sketch's mood.
+  // Hex colors (e.g. "#87ceeb"). If absent, defaults are used per theme.
   skyColor?: string;
   groundColor?: string;
   fogColor?: string;
   fogDensity?: FogDensity;
+  // Sun direction — controls lighting mood. Gemma can pick high noon vs sunset.
+  // Values roughly [-1..1, 0..1, -1..1]. Defaults to overhead if absent.
   sunPosition?: [number, number, number];
+  // URL of an AI-generated 3D model that replaces the central object in the scene
+  heroAssetUrl?: string;
 }

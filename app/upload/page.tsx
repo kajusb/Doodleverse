@@ -18,6 +18,7 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [withMusic, setWithMusic] = useState(false);
+  const [withHero, setWithHero] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const thoughtsRef = useRef<string[]>([]);
@@ -88,6 +89,7 @@ export default function UploadPage() {
 
       const nextIndex = thoughtIndexRef.current + 1;
 
+      // We've shown every thought (including the closer) at least once
       if (nextIndex >= list.length) {
         allThoughtsShownOnceRef.current = true;
         if (cycleCompleteRef.current) {
@@ -100,6 +102,7 @@ export default function UploadPage() {
       thoughtIndexRef.current = nextIndex;
       setCurrentThought(list[thoughtIndexRef.current]);
       setFadeKey((k) => k + 1);
+      // If this is the last thought, mark it so it doesn't fade out
       setIsFinalThought(nextIndex === list.length - 1);
 
       cycleTimerRef.current = setTimeout(advance, THOUGHT_DURATION_MS);
@@ -129,6 +132,8 @@ export default function UploadPage() {
       const narrationForm = new FormData();
       narrationForm.append("image", file);
       narrationForm.append("withMusic", withMusic ? "true" : "false");
+      const heroForm = new FormData();
+      heroForm.append("image", file);
 
       const scenePromise = fetch("/api/generate-scene", { method: "POST", body: sceneForm })
         .then(async (res) => {
@@ -148,6 +153,21 @@ export default function UploadPage() {
           console.error("NARRATION FAILED:", e);
           return null;
         });
+
+      // Hero asset (AI-generated 3D model). Fires in parallel; null if disabled or fails.
+      const heroPromise: Promise<string | null> = withHero
+        ? fetch("/api/generate-hero", { method: "POST", body: heroForm })
+            .then(async (res) => {
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || `Hero request failed (${res.status})`);
+              console.log("HERO RESPONSE:", data);
+              return data.glbUrl as string;
+            })
+            .catch((e) => {
+              console.error("HERO FAILED:", e);
+              return null;
+            })
+        : Promise.resolve(null);
 
       narrationPromise.then((thoughts) => {
         if (thoughts && thoughts.length > 0) {
@@ -186,6 +206,13 @@ export default function UploadPage() {
       });
 
       const scene = await scenePromise;
+
+      // Wait for the hero asset to finish (or fail gracefully) before saving
+      const heroAssetUrl = await heroPromise;
+      if (heroAssetUrl) {
+        scene.heroAssetUrl = heroAssetUrl;
+      }
+
       sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
       sessionStorage.removeItem("doodleverse:music");
 
@@ -319,6 +346,20 @@ export default function UploadPage() {
           <span className="text-sm">
             <span className="font-semibold">♪ Generate background music</span>
             <span className="opacity-60 ml-2">(adds ~15s)</span>
+          </span>
+        </label>
+
+        <label className="mt-3 flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={withHero}
+            onChange={(e) => setWithHero(e.target.checked)}
+            disabled={loading}
+            className="w-5 h-5 accent-emerald-500 cursor-pointer"
+          />
+          <span className="text-sm">
+            <span className="font-semibold">✨ Generate AI 3D model for the main object</span>
+            <span className="opacity-60 ml-2">(adds ~60-120s)</span>
           </span>
         </label>
 
