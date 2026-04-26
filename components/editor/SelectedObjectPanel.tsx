@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useSceneState } from "@/lib/sceneState";
 
 export function SelectedObjectPanel() {
-  const { scene, selectedObjectIndex, setSelectedObjectIndex } = useSceneState();
+  const { scene, selectedObjectIndex, setSelectedObjectIndex, updateScene, updateObject } = useSceneState();
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (selectedObjectIndex === null) return null;
 
@@ -11,9 +14,54 @@ export function SelectedObjectPanel() {
   const obj = isSingleHero ? null : scene.objects[selectedObjectIndex];
   const objectName = isSingleHero ? scene.name : (obj?.description || obj?.type || "Object");
 
-  const handleRegenerate = () => {
+  const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
+    const res = await fetch(dataUrl);
+    return await res.blob();
+  };
 
-    alert("Regenerate is coming soon- needs the original sketch saved.");
+  const handleRegenerate = async () => {
+    const sketchDataUrl = sessionStorage.getItem("doodleverse:original-sketch");
+    if (!sketchDataUrl) {
+      setError("Original sketch not found. Generate a new world first.");
+      return;
+    }
+
+    setIsRegenerating(true);
+    setError(null);
+
+    try {
+      const blob = await dataUrlToBlob(sketchDataUrl);
+      const formData = new FormData();
+      formData.append("image", blob, "sketch.png");
+
+      const res = await fetch("/api/generate-hero", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Server returned ${res.status}`);
+      }
+
+      const newUrl = data.glbUrl;
+      if (!newUrl) {
+        throw new Error("No model URL in response");
+      }
+
+      // Swap in the new model URL only — keep position/rotation as-is so it
+      // appears where the old one was.
+      if (isSingleHero) {
+        updateScene({ heroAssetUrl: newUrl });
+      } else {
+        updateObject(selectedObjectIndex, { glbUrl: newUrl });
+      }
+    } catch (err) {
+      console.error("Regenerate failed:", err);
+      setError(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   return (
@@ -27,6 +75,7 @@ export function SelectedObjectPanel() {
           onClick={() => setSelectedObjectIndex(null)}
           className="text-slate-400 hover:text-white transition text-xl leading-none"
           title="Deselect (Esc)"
+          disabled={isRegenerating}
         >
           ×
         </button>
@@ -46,12 +95,32 @@ export function SelectedObjectPanel() {
         </div>
       </div>
 
+      {error && (
+        <div className="mb-3 p-2 bg-red-900/40 border border-red-700 rounded text-xs text-red-200">
+          {error}
+        </div>
+      )}
+
       <button
         onClick={handleRegenerate}
-        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition"
+        disabled={isRegenerating}
+        className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
       >
-        🔄 Regenerate model
+        {isRegenerating ? (
+          <>
+            <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Regenerating... (~60s)
+          </>
+        ) : (
+          <>🔄 Regenerate model</>
+        )}
       </button>
+
+      {isRegenerating && (
+        <div className="mt-2 text-[10px] opacity-60 text-center">
+          TRELLIS is building a new 3D model
+        </div>
+      )}
     </div>
   );
 }

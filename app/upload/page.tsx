@@ -89,7 +89,6 @@ export default function UploadPage() {
 
       const nextIndex = thoughtIndexRef.current + 1;
 
-      // We've shown every thought (including the closer) at least once
       if (nextIndex >= list.length) {
         allThoughtsShownOnceRef.current = true;
         if (cycleCompleteRef.current) {
@@ -102,7 +101,6 @@ export default function UploadPage() {
       thoughtIndexRef.current = nextIndex;
       setCurrentThought(list[thoughtIndexRef.current]);
       setFadeKey((k) => k + 1);
-      // If this is the last thought, mark it so it doesn't fade out
       setIsFinalThought(nextIndex === list.length - 1);
 
       cycleTimerRef.current = setTimeout(advance, THOUGHT_DURATION_MS);
@@ -116,6 +114,16 @@ export default function UploadPage() {
     };
   }, [loading]);
 
+  // Read a File as a base64 data URL — used to save the original sketch
+  // so the Regenerate button can call /api/generate-hero again later.
+  const fileToBase64 = (f: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(f);
+    });
+
   const generate = async () => {
     if (!file) return;
     setLoading(true);
@@ -127,6 +135,15 @@ export default function UploadPage() {
     allThoughtsShownOnceRef.current = false;
 
     try {
+      // Save the original sketch as base64 so Regenerate can reuse it.
+      // Do this BEFORE the API calls so it's saved even if generation fails.
+      try {
+        const sketchBase64 = await fileToBase64(file);
+        sessionStorage.setItem("doodleverse:original-sketch", sketchBase64);
+      } catch (e) {
+        console.warn("Failed to save original sketch for regenerate:", e);
+      }
+
       const sceneForm = new FormData();
       sceneForm.append("image", file);
       const narrationForm = new FormData();
@@ -154,7 +171,6 @@ export default function UploadPage() {
           return null;
         });
 
-      // Hero asset (AI-generated 3D model). Fires in parallel; null if disabled or fails.
       const heroPromise: Promise<string | null> = withHero
         ? fetch("/api/generate-hero", { method: "POST", body: heroForm })
             .then(async (res) => {
@@ -207,7 +223,6 @@ export default function UploadPage() {
 
       const scene = await scenePromise;
 
-      // Wait for the hero asset to finish (or fail gracefully) before saving
       const heroAssetUrl = await heroPromise;
       if (heroAssetUrl) {
         scene.heroAssetUrl = heroAssetUrl;
@@ -249,7 +264,6 @@ export default function UploadPage() {
 
       await Promise.all([musicPromise, thoughtsDone]);
 
-      // Navigate immediately — the final thought is still visible (fade-in only)
       router.push("/view");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -313,7 +327,6 @@ export default function UploadPage() {
           )}
         </div>
 
-        {/* AI thinking display */}
         {loading && (
           <div className="mt-5 p-6 bg-slate-800/60 backdrop-blur-sm border border-slate-700 rounded-xl min-h-[100px] flex flex-col">
             <div className="text-xs uppercase tracking-widest opacity-60 mb-3 flex items-center gap-2">

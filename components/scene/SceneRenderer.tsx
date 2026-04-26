@@ -17,7 +17,13 @@ export function SceneRenderer({ scene }: { scene: SceneJson }) {
     return (
       <>
         <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
-        <HeroAsset url={scene.heroAssetUrl} obj={heroObj} index={0} />
+        {/* key forces a fresh mount when the URL changes (after Regenerate) */}
+        <HeroAsset
+          key={scene.heroAssetUrl}
+          url={scene.heroAssetUrl}
+          obj={heroObj}
+          index={0}
+        />
       </>
     );
   }
@@ -27,7 +33,7 @@ export function SceneRenderer({ scene }: { scene: SceneJson }) {
       <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
       {scene.objects.map((obj, i) => {
         if (!obj.glbUrl) return null;
-        return <HeroAsset key={i} obj={obj} url={obj.glbUrl} index={i} />;
+        return <HeroAsset key={`${i}-${obj.glbUrl}`} obj={obj} url={obj.glbUrl} index={i} />;
       })}
     </>
   );

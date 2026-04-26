@@ -28,27 +28,38 @@ export function HeroAsset({ obj, url, index }: Props) {
 
 interface FitTransform {
   scale: number;
-  offsetX: number;
-  offsetY: number;
-  offsetZ: number;
-  // Real model dimensions in WORLD-SPACE meters (after fit.scale applied)
+  // World-meters dimensions of the model AFTER scaling
   worldSizeX: number;
   worldSizeY: number;
   worldSizeZ: number;
-  // Center of the model in LOCAL coords (inside the inner scaled group),
-  // relative to the inner group's origin.
-  localCenterX: number;
-  localCenterY: number;
-  localCenterZ: number;
 }
 
 function HeroAssetInner({ obj, url, index }: Props) {
   const { scene: originalScene } = useGLTF(url);
   const { selectedObjectIndex, setSelectedObjectIndex } = useSceneState();
 
+  // Clone AND immediately re-center the scene so its bounding box is at origin.
+  // This eliminates any TRELLIS quirk where the model's geometry is offset
+  // from its scene root (some models come back with center at (5.99, 0, 0)).
   const clonedScene = useMemo(() => {
     if (!originalScene) return null;
-    return SkeletonUtils.clone(originalScene);
+    const cloned = SkeletonUtils.clone(originalScene);
+    // Compute the bounding box of the cloned scene's meshes
+    cloned.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(cloned);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    // Shift each top-level child by -center so the whole model is centered at origin.
+    // We shift CHILDREN (not the root) because the root needs to stay at (0,0,0)
+    // for our outer group's position/scale to behave predictably.
+    cloned.children.forEach((child) => {
+      child.position.x -= center.x;
+      // Move bottom of model to y=0 instead of centering Y (we want it on the ground)
+      child.position.y -= box.min.y;
+      child.position.z -= center.z;
+    });
+    cloned.updateMatrixWorld(true);
+    return cloned;
   }, [originalScene]);
 
   const objY = obj.y ?? 0;
@@ -60,6 +71,11 @@ function HeroAssetInner({ obj, url, index }: Props) {
 
   useEffect(() => {
     if (!clonedScene) return;
+
+    console.log("HeroAsset cloned scene (after recentering):", {
+      url,
+      childCount: clonedScene.children.length,
+    });
 
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -76,7 +92,10 @@ function HeroAssetInner({ obj, url, index }: Props) {
       }
     });
 
-    const box = computeMeshOnlyBox(clonedScene);
+    // After re-centering, the bounding box is now centered horizontally and
+    // sits on Y=0. Compute size for scaling.
+    clonedScene.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(clonedScene);
     const size = new THREE.Vector3();
     box.getSize(size);
 
@@ -85,29 +104,19 @@ function HeroAssetInner({ obj, url, index }: Props) {
 
     const scale = TARGET_SIZE / maxDim;
 
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    const offsetX = -center.x * scale;
-    const offsetZ = -center.z * scale;
-
-    const isFloating = objY > 0;
-    const offsetY = isFloating
-      ? -center.y * scale
-      : -box.min.y * scale - 0.05;
+    console.log("HeroAsset fit:", {
+      url,
+      size: size.toArray(),
+      scale,
+    });
 
     setFit({
       scale,
-      offsetX,
-      offsetY,
-      offsetZ,
       worldSizeX: size.x * scale,
       worldSizeY: size.y * scale,
       worldSizeZ: size.z * scale,
-      localCenterX: center.x,
-      localCenterY: center.y,
-      localCenterZ: center.z,
     });
-  }, [clonedScene, objType, objY]);
+  }, [clonedScene, objType, objY, url]);
 
   // Apply green tint when hovering or selected
   useEffect(() => {
@@ -135,8 +144,6 @@ function HeroAssetInner({ obj, url, index }: Props) {
   }, [clonedScene, isHovering, selectedObjectIndex, index]);
 
   const groupRef = useRef<THREE.Group>(null);
-  // Re-measure collision box when fit OR position OR rotation changes,
-  // so the collider always matches where the object currently is in the world.
   useCollider(groupRef, "wall", [fit, obj.x, obj.y, obj.z, obj.rotation]);
 
   if (!clonedScene) return null;
@@ -161,6 +168,22 @@ function HeroAssetInner({ obj, url, index }: Props) {
     document.body.style.cursor = "";
   };
 
+  // The arrows pivot around the model's center. Since we re-centered the
+  // mesh at origin (and base at y=0), the center is at (0, halfHeight, 0)
+  // in LOCAL units (inside the inner scaled group).
+  const arrowsFit = fit ? {
+    scale: fit.scale,
+    offsetX: 0,
+    offsetY: 0,
+    offsetZ: 0,
+    worldSizeX: fit.worldSizeX,
+    worldSizeY: fit.worldSizeY,
+    worldSizeZ: fit.worldSizeZ,
+    localCenterX: 0,
+    localCenterY: (fit.worldSizeY * 0.5) / fit.scale,
+    localCenterZ: 0,
+  } : null;
+
   return (
     <group
       ref={groupRef}
@@ -171,39 +194,11 @@ function HeroAssetInner({ obj, url, index }: Props) {
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
     >
-      <group
-        position={fit ? [fit.offsetX, fit.offsetY, fit.offsetZ] : [0, 0, 0]}
-        scale={fit?.scale ?? 1}
-      >
+      <group scale={fit?.scale ?? 1}>
         <primitive object={clonedScene} />
 
-        {fit && isSelected && <ObjectArrows fit={fit} index={index} />}
+        {arrowsFit && isSelected && <ObjectArrows fit={arrowsFit} index={index} />}
       </group>
     </group>
   );
-}
-
-function computeMeshOnlyBox(root: THREE.Object3D): THREE.Box3 {
-  const box = new THREE.Box3();
-  let foundMesh = false;
-
-  root.updateWorldMatrix(true, true);
-
-  root.traverse((child) => {
-    if (child instanceof THREE.Mesh && child.geometry) {
-      const meshBox = new THREE.Box3().setFromObject(child);
-      if (foundMesh) {
-        box.union(meshBox);
-      } else {
-        box.copy(meshBox);
-        foundMesh = true;
-      }
-    }
-  });
-
-  if (!foundMesh) {
-    box.setFromObject(root);
-  }
-
-  return box;
 }
