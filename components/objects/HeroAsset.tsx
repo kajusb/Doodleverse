@@ -87,7 +87,7 @@ function HeroAssetInner({ url }: Props) {
   }, [clonedScene]);
 
   const groupRef = useRef<THREE.Group>(null);
-  useCollider(groupRef, "wall");
+  useCollider(groupRef, "wall", [fit]);
 
   if (!clonedScene) return null;
 
