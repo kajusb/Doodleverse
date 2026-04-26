@@ -1,16 +1,18 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { Sky } from "@react-three/drei";
+import { Sky as DreiSky } from "@react-three/drei";
 import * as THREE from "three";
 import { Controls } from "./Controls";
 import { SceneRenderer } from "./SceneRenderer";
+import { GradientSky } from "./Sky";
+import { Atmosphere } from "./Atmosphere";
+import { classifyMood } from "@/lib/sceneAtmosphere";
 import { CollisionProvider } from "@/lib/collisionRegistry";
 import type { SceneJson, FogDensity } from "@/types/scene";
 
 const DEFAULT_SUN: [number, number, number] = [0.3, 1, 0.3];
 
-// Maps the AI's fog category to actual exponential density values.
 const FOG_DENSITY_MAP: Record<FogDensity, number> = {
   none: 0,
   light: 0.004,
@@ -32,6 +34,9 @@ export function Scene({ scene }: { scene: SceneJson }) {
   const fogDensity = FOG_DENSITY_MAP[fogDensityKey];
 
   const useCustomSky = !!scene.skyColor;
+  const mood = classifyMood(scene);
+
+  console.log("Scene mood:", mood);
 
   return (
     <Canvas
@@ -39,25 +44,26 @@ export function Scene({ scene }: { scene: SceneJson }) {
       camera={{ position: [0, 1.6, 12], fov: 70, near: 0.1, far: 500 }}
       style={{ width: "100vw", height: "100vh" }}
       gl={{
-        // Disable tone mapping- by default R3F applies ACES tone mapping
-        // which compresses highlights and washes out vivid TRELLIS textures.
         toneMapping: THREE.NoToneMapping,
         outputColorSpace: THREE.SRGBColorSpace,
       }}
     >
-      {/* Sky and atmosphere */}
+      {/* Sky */}
       {useCustomSky ? (
-        <color attach="background" args={[scene.skyColor!]} />
+        <GradientSky topColor={scene.skyColor!} />
       ) : (
-        <Sky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
+        <DreiSky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
       )}
+
+      {/* Fog */}
       {fogDensity > 0 && (
         <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
       )}
 
-      {/* Lighting — bright daylight setup tuned for TRELLIS materials.
-          Sun does most of the work; ambient fills shadows so dark sides of
-          the model are still visible; back-fill prevents pitch-black backs. */}
+      {/* Atmospheric extras based on the scene's mood */}
+      <Atmosphere mood={mood} />
+
+      {/* Lighting */}
       <ambientLight intensity={0.8} />
       <directionalLight
         position={sunWorldPos}
@@ -71,7 +77,6 @@ export function Scene({ scene }: { scene: SceneJson }) {
         shadow-camera-bottom={-30}
         shadow-bias={-0.0005}
       />
-      {/* Soft fill from opposite the sun so the back of the model isn't black */}
       <directionalLight
         position={[-sunWorldPos[0], sunWorldPos[1] * 0.5, -sunWorldPos[2]]}
         intensity={0.5}
