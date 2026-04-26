@@ -1,35 +1,47 @@
 "use client";
 
-import type { SceneJson, SceneObject } from "@/types/scene";
-import { Tree } from "@/components/objects/Tree";
-import { House } from "@/components/objects/House";
-import { Rock } from "@/components/objects/Rock";
-import { River } from "@/components/objects/River";
-import { Path } from "@/components/objects/Path";
-import { Bridge } from "@/components/objects/Bridge";
-import { Water } from "@/components/objects/Water";
+import type { SceneJson } from "@/types/scene";
 import { Terrain } from "@/components/scene/Terrain";
+import { HeroAsset } from "@/components/objects/HeroAsset";
 
-function renderObject(obj: SceneObject, key: number) {
-  switch (obj.type) {
-    case "tree": return <Tree key={key} obj={obj} />;
-    case "house": return <House key={key} obj={obj} />;
-    case "rock": return <Rock key={key} obj={obj} />;
-    case "river": return <River key={key} obj={obj} />;
-    case "path": return <Path key={key} obj={obj} />;
-    case "bridge": return <Bridge key={key} obj={obj} />;
-    case "water": return <Water key={key} obj={obj} />;
-    default:
-      console.warn("Unknown object type:", obj);
-      return null;
-  }
-}
+export const HERO_INDEX = -1;
 
 export function SceneRenderer({ scene }: { scene: SceneJson }) {
+  // Guard against old scenes that don't have an objects[] array
+  const objects = scene.objects ?? [];
+
   return (
     <>
-      <Terrain terrain={scene.terrain} size={500} />
-      {scene.objects.map((obj, i) => renderObject(obj, i))}
+      <Terrain terrain={scene.terrain} size={1000} color={scene.groundColor} />
+
+      {scene.heroAssetUrl && (
+        <HeroAsset
+          key={scene.heroAssetUrl}
+          url={scene.heroAssetUrl}
+          obj={{
+            type: "house",
+            x: scene.heroX ?? 0,
+            y: scene.heroY ?? 0,
+            z: scene.heroZ ?? 0,
+            rotation: scene.heroRotation ?? 0,
+            scale: scene.heroScale ?? 1,
+            glbUrl: scene.heroAssetUrl,
+          }}
+          index={HERO_INDEX}
+        />
+      )}
+
+      {objects.map((obj, i) => {
+        if (!obj.glbUrl) return null;
+        return (
+          <HeroAsset
+            key={`obj-${i}-${obj.glbUrl}`}
+            obj={obj}
+            url={obj.glbUrl}
+            index={i}
+          />
+        );
+      })}
     </>
   );
 }

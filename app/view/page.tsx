@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { SceneJson } from "@/types/scene";
+import { SceneStateProvider, useSceneState } from "@/lib/sceneState";
+import { EditorPanel } from "@/components/editor/EditorPanel";
+import { SelectedObjectPanel } from "@/components/editor/SelectedObjectPanel";
+import { AddObjectButton } from "@/components/editor/AddObjectButton";
+import { CopyPasteHandler } from "@/components/editor/CopyPasteHandler";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
