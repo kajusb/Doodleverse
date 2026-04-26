@@ -13,6 +13,9 @@ interface SceneStateContextValue {
   setEditMode: (v: boolean) => void;
   selectedObjectIndex: number | null;
   setSelectedObjectIndex: (i: number | null) => void;
+  // True while user is actively dragging the selected object
+  isDragging: boolean;
+  setIsDragging: (v: boolean) => void;
 }
 
 const SceneStateContext = createContext<SceneStateContextValue | null>(null);
@@ -27,8 +30,8 @@ export function SceneStateProvider({
   const [scene, setScene] = useState<SceneJson>(initialScene);
   const [editMode, setEditMode] = useState(false);
   const [selectedObjectIndex, setSelectedObjectIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Persist live changes back to sessionStorage so refresh keeps edits
   useEffect(() => {
     sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
   }, [scene]);
@@ -70,6 +73,8 @@ export function SceneStateProvider({
         setEditMode,
         selectedObjectIndex,
         setSelectedObjectIndex,
+        isDragging,
+        setIsDragging,
       }}
     >
       {children}

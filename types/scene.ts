@@ -22,6 +22,7 @@ export interface SceneObject {
   length?: number;
   description?: string;
   color?: string;
+  glbUrl?: string;
 }
 
 export interface SceneJson {
@@ -31,15 +32,16 @@ export interface SceneJson {
   objects: SceneObject[];
   size?: number;
   music?: string;
-  // Atmosphere overrides — Gemma sets these based on the sketch's mood.
-  // Hex colors (e.g. "#87ceeb"). If absent, defaults are used per theme.
+  // URL of a single hero GLB used in single-hero scenes
+  heroAssetUrl?: string;
+  // Position/rotation of the hero asset in the world (drag/rotate state)
+  heroX?: number;
+  heroZ?: number;
+  heroRotation?: number;
+  // Atmosphere
   skyColor?: string;
   groundColor?: string;
   fogColor?: string;
   fogDensity?: FogDensity;
-  // Sun direction — controls lighting mood. Gemma can pick high noon vs sunset.
-  // Values roughly [-1..1, 0..1, -1..1]. Defaults to overhead if absent.
   sunPosition?: [number, number, number];
-  // URL of an AI-generated 3D model that replaces the central object in the scene
-  heroAssetUrl?: string;
 }

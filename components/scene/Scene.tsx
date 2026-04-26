@@ -7,6 +7,7 @@ import { Controls } from "./Controls";
 import { SceneRenderer } from "./SceneRenderer";
 import { GradientSky } from "./Sky";
 import { Atmosphere } from "./Atmosphere";
+import { DragHandler } from "./DragHandler";
 import { classifyMood } from "@/lib/sceneAtmosphere";
 import { CollisionProvider } from "@/lib/collisionRegistry";
 import type { SceneJson, FogDensity } from "@/types/scene";
@@ -36,8 +37,6 @@ export function Scene({ scene }: { scene: SceneJson }) {
   const useCustomSky = !!scene.skyColor;
   const mood = classifyMood(scene);
 
-  console.log("Scene mood:", mood);
-
   return (
     <Canvas
       shadows
@@ -48,22 +47,17 @@ export function Scene({ scene }: { scene: SceneJson }) {
         outputColorSpace: THREE.SRGBColorSpace,
       }}
     >
-      {/* Sky */}
       {useCustomSky ? (
         <GradientSky topColor={scene.skyColor!} />
       ) : (
         <DreiSky sunPosition={sunWorldPos} turbidity={8} rayleigh={2} />
       )}
-
-      {/* Fog */}
       {fogDensity > 0 && (
         <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
       )}
 
-      {/* Atmospheric extras based on the scene's mood */}
       <Atmosphere mood={mood} />
 
-      {/* Lighting */}
       <ambientLight intensity={0.8} />
       <directionalLight
         position={sunWorldPos}
@@ -85,6 +79,7 @@ export function Scene({ scene }: { scene: SceneJson }) {
       <CollisionProvider>
         <SceneRenderer scene={scene} />
         <Controls scene={scene} />
+        <DragHandler />
       </CollisionProvider>
     </Canvas>
   );

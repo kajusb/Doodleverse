@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import type { SceneJson } from "@/types/scene";
 import { SceneStateProvider, useSceneState } from "@/lib/sceneState";
 import { EditorPanel } from "@/components/editor/EditorPanel";
+import { SelectedObjectPanel } from "@/components/editor/SelectedObjectPanel";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
@@ -67,6 +68,7 @@ export default function ViewPage() {
         const source = ctx.createBufferSource();
         source.buffer = audioBuf;
         source.loop = true;
+        // Trim the encoder padding off the loop boundaries (~10ms each side)
         source.loopStart = 0.25;
         source.loopEnd = audioBuf.duration - 0.25;
 
@@ -162,6 +164,7 @@ function ViewContent({
       </button>
 
       <EditorPanel />
+      <SelectedObjectPanel />
 
       {needsClickToPlay && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none z-[100]">
