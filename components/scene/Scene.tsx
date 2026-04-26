@@ -2,6 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Sky } from "@react-three/drei";
+import * as THREE from "three";
 import { Controls } from "./Controls";
 import { SceneRenderer } from "./SceneRenderer";
 import { CollisionProvider } from "@/lib/collisionRegistry";
@@ -10,12 +11,11 @@ import type { SceneJson, FogDensity } from "@/types/scene";
 const DEFAULT_SUN: [number, number, number] = [0.3, 1, 0.3];
 
 // Maps the AI's fog category to actual exponential density values.
-// Tuned LOW so distant atmosphere reads as subtle haze, not white-out.
 const FOG_DENSITY_MAP: Record<FogDensity, number> = {
   none: 0,
-  light: 0.004,    // very subtle, mostly invisible up close
-  medium: 0.010,   // visible mid-distance
-  heavy: 0.020,    // clearly fogged but model stays readable
+  light: 0.004,
+  medium: 0.010,
+  heavy: 0.020,
 };
 
 export function Scene({ scene }: { scene: SceneJson }) {
@@ -38,6 +38,12 @@ export function Scene({ scene }: { scene: SceneJson }) {
       shadows
       camera={{ position: [0, 1.6, 12], fov: 70, near: 0.1, far: 500 }}
       style={{ width: "100vw", height: "100vh" }}
+      gl={{
+        // Disable tone mapping- by default R3F applies ACES tone mapping
+        // which compresses highlights and washes out vivid TRELLIS textures.
+        toneMapping: THREE.NoToneMapping,
+        outputColorSpace: THREE.SRGBColorSpace,
+      }}
     >
       {/* Sky and atmosphere */}
       {useCustomSky ? (
@@ -49,15 +55,13 @@ export function Scene({ scene }: { scene: SceneJson }) {
         <fogExp2 attach="fog" args={[fogColor, fogDensity]} />
       )}
 
-      {/* Lighting — bright but balanced, designed to render TRELLIS materials
-          well without washing out colors. */}
-      <ambientLight intensity={1.2} />
-      <hemisphereLight
-        args={[scene.skyColor ?? "#ffffff", scene.groundColor ?? "#888888", 0.6]}
-      />
+      {/* Lighting — bright daylight setup tuned for TRELLIS materials.
+          Sun does most of the work; ambient fills shadows so dark sides of
+          the model are still visible; back-fill prevents pitch-black backs. */}
+      <ambientLight intensity={0.8} />
       <directionalLight
         position={sunWorldPos}
-        intensity={1.8}
+        intensity={1.5}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -67,7 +71,7 @@ export function Scene({ scene }: { scene: SceneJson }) {
         shadow-camera-bottom={-30}
         shadow-bias={-0.0005}
       />
-      {/* Soft fill from opposite the sun */}
+      {/* Soft fill from opposite the sun so the back of the model isn't black */}
       <directionalLight
         position={[-sunWorldPos[0], sunWorldPos[1] * 0.5, -sunWorldPos[2]]}
         intensity={0.5}
