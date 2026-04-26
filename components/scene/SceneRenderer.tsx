@@ -6,10 +6,10 @@ import { HeroAsset } from "@/components/objects/HeroAsset";
 
 export function SceneRenderer({ scene }: { scene: SceneJson }) {
   if (scene.heroAssetUrl) {
-    // Use heroX/heroZ/heroRotation from scene state, default to origin
     const heroObj = {
       type: "house" as const,
       x: scene.heroX ?? 0,
+      y: scene.heroY ?? 0,
       z: scene.heroZ ?? 0,
       rotation: scene.heroRotation ?? 0,
       glbUrl: scene.heroAssetUrl,

@@ -36,6 +36,7 @@ export interface SceneJson {
   heroAssetUrl?: string;
   // Position/rotation of the hero asset in the world (drag/rotate state)
   heroX?: number;
+  heroY?: number;
   heroZ?: number;
   heroRotation?: number;
   // Atmosphere
