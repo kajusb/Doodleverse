@@ -78,7 +78,6 @@ function resolveOverlap(
 }
 
 export function Controls({
-  scene: _scene,
   speed = 5,
   eyeHeight = 1.6,
   jumpVelocity = 6,

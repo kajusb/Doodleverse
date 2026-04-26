@@ -4,6 +4,30 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { SceneJson } from "@/types/scene";
 
+type GenerationDraft = {
+  title: string;
+  originalImageUrl?: string;
+  generatedModelUrl: string;
+  generatedThumbnailUrl?: string;
+  audioUrl?: string | null;
+  theme: string;
+  meshyTaskId?: string | null;
+  status: "completed";
+};
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildSceneDataUrl(scene: SceneJson): string {
+  return `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(scene))}`;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -38,8 +62,11 @@ export default function UploadPage() {
     setLoading(true);
     setError(null);
     setLoadingStage("Interpreting your sketch…");
+    sessionStorage.removeItem("doodleverse:generationDraft");
 
     try {
+      const originalImageUrl = await readFileAsDataUrl(file);
+
       // Scene generation always runs
       const form = new FormData();
       form.append("image", file);
@@ -47,10 +74,14 @@ export default function UploadPage() {
       const sceneData = await sceneRes.json();
       if (!sceneRes.ok) throw new Error(sceneData.error || `Scene request failed (${sceneRes.status})`);
       const scene: SceneJson = sceneData.scene;
+      const worldTitle = scene.name?.trim() || "My Generated World";
+      const generatedModelUrl = buildSceneDataUrl(scene);
 
       sessionStorage.setItem("doodleverse:scene", JSON.stringify(scene));
       // Always wipe any leftover music from a prior generation
       sessionStorage.removeItem("doodleverse:music");
+
+      let audioUrl: string | null = null;
 
       // Music only runs if the user opted in AND Gemma produced a prompt
       if (withMusic && scene.music) {
@@ -70,6 +101,7 @@ export default function UploadPage() {
               reader.readAsDataURL(blob);
             });
             sessionStorage.setItem("doodleverse:music", dataUrl);
+            audioUrl = dataUrl;
           } else {
             // Music failed but the scene is fine — proceed silently
             const errData = await musicRes.json().catch(() => ({}));
@@ -79,6 +111,19 @@ export default function UploadPage() {
           console.warn("Music generation error:", e);
         }
       }
+
+      const generationDraft: GenerationDraft = {
+        title: worldTitle,
+        originalImageUrl,
+        generatedModelUrl,
+        generatedThumbnailUrl: originalImageUrl,
+        audioUrl,
+        theme: scene.theme,
+        meshyTaskId: null,
+        status: "completed",
+      };
+
+      sessionStorage.setItem("doodleverse:generationDraft", JSON.stringify(generationDraft));
 
       router.push("/view");
     } catch (e) {
@@ -163,6 +208,13 @@ export default function UploadPage() {
         )}
 
         <div className="mt-6 flex gap-3 justify-center">
+          <button
+            onClick={() => router.push("/generations")}
+            disabled={loading}
+            className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 transition"
+          >
+            Saved worlds
+          </button>
           <button
             onClick={() => router.push("/sample")}
             disabled={loading}
