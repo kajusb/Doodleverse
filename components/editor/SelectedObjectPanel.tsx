@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useSceneState } from "@/lib/sceneState";
 
+const SCALE_MIN = 0.25;
+const SCALE_MAX = 4.0;
+const SCALE_STEP = 0.05;
+
 export function SelectedObjectPanel() {
   const { scene, selectedObjectIndex, setSelectedObjectIndex, updateScene, updateObject } = useSceneState();
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -10,9 +14,24 @@ export function SelectedObjectPanel() {
 
   if (selectedObjectIndex === null) return null;
 
+  // Hero uses index -1 (sentinel). Other objects use their array index.
   const isSingleHero = selectedObjectIndex === -1 && !!scene.heroAssetUrl;
   const obj = isSingleHero ? null : scene.objects[selectedObjectIndex];
   const objectName = isSingleHero ? scene.name : (obj?.description || obj?.type || "Object");
+
+  // Current scale value (defaults to 1 if not set)
+  const currentScale = isSingleHero
+    ? (scene.heroScale ?? 1)
+    : (obj?.scale ?? 1);
+
+  // Apply a new scale value to the right place in scene state
+  const setScale = (newScale: number) => {
+    if (isSingleHero) {
+      updateScene({ heroScale: newScale });
+    } else {
+      updateObject(selectedObjectIndex, { scale: newScale });
+    }
+  };
 
   const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
     const res = await fetch(dataUrl);
@@ -49,8 +68,6 @@ export function SelectedObjectPanel() {
         throw new Error("No model URL in response");
       }
 
-      // Swap in the new model URL only — keep position/rotation as-is so it
-      // appears where the old one was.
       if (isSingleHero) {
         updateScene({ heroAssetUrl: newUrl });
       } else {
@@ -92,6 +109,39 @@ export function SelectedObjectPanel() {
         <div>
           <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">Esc</kbd>{" "}
           to deselect
+        </div>
+      </div>
+
+      {/* Scale slider */}
+      <div className="mb-4 pb-4 border-b border-slate-700">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs uppercase tracking-widest opacity-60">Scale</label>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono opacity-80">
+              {currentScale.toFixed(2)}×
+            </span>
+            <button
+              onClick={() => setScale(1)}
+              className="text-[10px] px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded transition"
+              title="Reset to 1.0×"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+        <input
+          type="range"
+          min={SCALE_MIN}
+          max={SCALE_MAX}
+          step={SCALE_STEP}
+          value={currentScale}
+          onChange={(e) => setScale(parseFloat(e.target.value))}
+          className="w-full accent-emerald-500 cursor-pointer"
+        />
+        <div className="flex justify-between text-[10px] opacity-50 mt-1">
+          <span>{SCALE_MIN}×</span>
+          <span>1×</span>
+          <span>{SCALE_MAX}×</span>
         </div>
       </div>
 

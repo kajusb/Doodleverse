@@ -32,13 +32,13 @@ export interface SceneJson {
   objects: SceneObject[];
   size?: number;
   music?: string;
-  // URL of a single hero GLB used in single-hero scenes
+  // The legacy single hero asset
   heroAssetUrl?: string;
-  // Position/rotation of the hero asset in the world (drag/rotate state)
   heroX?: number;
   heroY?: number;
   heroZ?: number;
   heroRotation?: number;
+  heroScale?: number;
   // Atmosphere
   skyColor?: string;
   groundColor?: string;
