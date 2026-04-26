@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { SceneJson } from "@/types/scene";
+import { SceneStateProvider, useSceneState } from "@/lib/sceneState";
+import { EditorPanel } from "@/components/editor/EditorPanel";
 
 const Scene = dynamic(
   () => import("@/components/scene/Scene").then((m) => m.Scene),
@@ -48,12 +50,12 @@ export default function ViewPage() {
 
     const startAudio = async () => {
       try {
-        // Fetch and decode the audio bytes into a buffer we can loop in-memory
         const res = await fetch(state.musicUrl!);
         const arrayBuf = await res.arrayBuffer();
 
-        // Use webkit prefix as fallback for older Safari
-        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         const ctx = new Ctx();
         const audioBuf = await ctx.decodeAudioData(arrayBuf);
 
@@ -65,7 +67,6 @@ export default function ViewPage() {
         const source = ctx.createBufferSource();
         source.buffer = audioBuf;
         source.loop = true;
-        // Trim the encoder padding off the loop boundaries (~10ms each side)
         source.loopStart = 0.25;
         source.loopEnd = audioBuf.duration - 0.25;
 
@@ -78,8 +79,6 @@ export default function ViewPage() {
         sourceRef.current = source;
         gainRef.current = gain;
 
-        // If the AudioContext is suspended (browser autoplay block), try to
-        // resume on first click anywhere on the page
         if (ctx.state === "suspended") {
           setNeedsClickToPlay(true);
           const resume = async () => {
@@ -102,7 +101,9 @@ export default function ViewPage() {
       cancelled = true;
       try {
         sourceRef.current?.stop();
-      } catch { /* already stopped */ }
+      } catch {
+        /* already stopped */
+      }
       audioCtxRef.current?.close();
       sourceRef.current = null;
       gainRef.current = null;
@@ -126,19 +127,44 @@ export default function ViewPage() {
     );
   }
 
+  // Wrap the rendered world in the scene state provider so the editor panel
+  // and other UI can read/update it live.
+  return (
+    <SceneStateProvider initialScene={state.scene}>
+      <ViewContent
+        needsClickToPlay={needsClickToPlay}
+        onNewSketch={() => router.push("/upload")}
+      />
+    </SceneStateProvider>
+  );
+}
+
+// Inner component that lives INSIDE the provider — it reads the live scene
+// (with any edits applied) and passes it to <Scene>.
+function ViewContent({
+  needsClickToPlay,
+  onNewSketch,
+}: {
+  needsClickToPlay: boolean;
+  onNewSketch: () => void;
+}) {
+  const { scene } = useSceneState();
+
   return (
     <>
-      <Scene scene={state.scene} />
+      <Scene scene={scene} />
 
       <button
-        onClick={() => router.push("/upload")}
-        className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition text-sm z-10"
+        onClick={onNewSketch}
+        className="absolute top-4 right-4 px-4 py-2 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition text-sm z-[100]"
       >
         ← New sketch
       </button>
 
+      <EditorPanel />
+
       {needsClickToPlay && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none z-[100]">
           Click anywhere to enable music
         </div>
       )}
