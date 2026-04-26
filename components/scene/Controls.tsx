@@ -16,6 +16,11 @@ const WALK_SPEED = 6.0;
 const RUN_SPEED = 12.0;
 const MOUSE_SENSITIVITY = 0.0025;
 
+// Jump physics
+const GRAVITY = 25.0;          // m/s² downward
+const JUMP_VELOCITY = 8.0;     // m/s upward when jump pressed
+const GROUND_Y = PLAYER_HEIGHT; // Where the player rests (camera y on ground)
+
 export function Controls({ scene: _scene }: Props) {
   const gl = useThree((s) => s.gl);
   const reg = useCollisionRegistry();
@@ -23,12 +28,19 @@ export function Controls({ scene: _scene }: Props) {
   // Look angles (refs so they survive renders without triggering them)
   const yaw = useRef(0);
   const pitch = useRef(0);
-  // Held movement keys
-  const keys = useRef({ w: false, a: false, s: false, d: false, shift: false });
-  // Whether right mouse button is held — only then does mouse-look work
+  // Held movement keys (now includes jump)
+  const keys = useRef({
+    w: false, a: false, s: false, d: false,
+    shift: false, jump: false,
+  });
+  // Whether right mouse button is held
   const isLooking = useRef(false);
   // Whether we've initialized the camera position yet
   const initialized = useRef(false);
+  // Vertical velocity for jump physics
+  const verticalVelocity = useRef(0);
+  // Whether the player is on the ground
+  const onGround = useRef(true);
 
   // Mouse look — only active while right mouse is held
   useEffect(() => {
@@ -80,7 +92,7 @@ export function Controls({ scene: _scene }: Props) {
     };
   }, [gl]);
 
-  // Keyboard: WASD movement
+  // Keyboard: WASD movement + Space jump
   useEffect(() => {
     const setKey = (code: string, down: boolean) => {
       switch (code) {
@@ -104,6 +116,9 @@ export function Controls({ scene: _scene }: Props) {
         case "ShiftRight":
           keys.current.shift = down;
           break;
+        case "Space":
+          keys.current.jump = down;
+          break;
       }
     };
 
@@ -117,6 +132,8 @@ export function Controls({ scene: _scene }: Props) {
       ) {
         return;
       }
+      // Prevent Space from scrolling the page
+      if (e.code === "Space") e.preventDefault();
       setKey(e.code, true);
     };
     const onKeyUp = (e: KeyboardEvent) => setKey(e.code, false);
@@ -129,9 +146,6 @@ export function Controls({ scene: _scene }: Props) {
     };
   }, []);
 
-  // Per-frame: read state.camera from useFrame's state arg (NOT the
-  // captured camera from useThree — that's what triggers React Compiler).
-  // Mutating the camera through this argument is the canonical R3F pattern.
   useFrame((state, delta) => {
     const camera = state.camera;
 
@@ -145,7 +159,7 @@ export function Controls({ scene: _scene }: Props) {
     // Apply look angles
     camera.rotation.set(pitch.current, yaw.current, 0, "YXZ");
 
-    // Compute movement direction from WASD relative to camera yaw
+    // Horizontal movement from WASD (relative to camera yaw)
     const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
       new THREE.Vector3(0, 1, 0),
       yaw.current
@@ -173,7 +187,22 @@ export function Controls({ scene: _scene }: Props) {
       if (!blockedZ) camera.position.z = next.z;
     }
 
-    camera.position.y = PLAYER_HEIGHT;
+    // Jump — start jump if grounded and Space is held
+    if (keys.current.jump && onGround.current) {
+      verticalVelocity.current = JUMP_VELOCITY;
+      onGround.current = false;
+    }
+
+    // Apply gravity to vertical velocity, then update Y
+    verticalVelocity.current -= GRAVITY * delta;
+    camera.position.y += verticalVelocity.current * delta;
+
+    // Land on ground
+    if (camera.position.y <= GROUND_Y) {
+      camera.position.y = GROUND_Y;
+      verticalVelocity.current = 0;
+      onGround.current = true;
+    }
   });
 
   return null;
@@ -187,7 +216,6 @@ function collidesAt(
   const boxes = reg.getBoxes();
   for (const c of boxes) {
     if (c.mode !== "wall" && c.mode !== "block") continue;
-    // Inflate AABB by player radius for a cylinder-like check
     if (
       x > c.aabb.minX - PLAYER_RADIUS &&
       x < c.aabb.maxX + PLAYER_RADIUS &&
