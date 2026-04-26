@@ -22,11 +22,6 @@ type LoadState =
 export default function ViewPage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: "loading" });
-  const [needsClickToPlay, setNeedsClickToPlay] = useState(false);
-
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("doodleverse:scene");
@@ -42,75 +37,6 @@ export default function ViewPage() {
       setState({ status: "missing" });
     }
   }, []);
-
-  // Set up gapless looping audio when the scene is ready
-  useEffect(() => {
-    if (state.status !== "ready" || !state.musicUrl) return;
-
-    let cancelled = false;
-
-    const startAudio = async () => {
-      try {
-        const res = await fetch(state.musicUrl!);
-        const arrayBuf = await res.arrayBuffer();
-
-        const Ctx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const ctx = new Ctx();
-        const audioBuf = await ctx.decodeAudioData(arrayBuf);
-
-        if (cancelled) {
-          ctx.close();
-          return;
-        }
-
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuf;
-        source.loop = true;
-        source.loopStart = 0.25;
-        source.loopEnd = audioBuf.duration - 0.25;
-
-        const gain = ctx.createGain();
-        gain.gain.value = 0.5;
-        source.connect(gain).connect(ctx.destination);
-        source.start();
-
-        audioCtxRef.current = ctx;
-        sourceRef.current = source;
-        gainRef.current = gain;
-
-        if (ctx.state === "suspended") {
-          setNeedsClickToPlay(true);
-          const resume = async () => {
-            await ctx.resume();
-            if (ctx.state === "running") {
-              setNeedsClickToPlay(false);
-              window.removeEventListener("click", resume);
-            }
-          };
-          window.addEventListener("click", resume);
-        }
-      } catch (e) {
-        console.warn("Audio setup failed:", e);
-      }
-    };
-
-    startAudio();
-
-    return () => {
-      cancelled = true;
-      try {
-        sourceRef.current?.stop();
-      } catch {
-        /* already stopped */
-      }
-      audioCtxRef.current?.close();
-      sourceRef.current = null;
-      gainRef.current = null;
-      audioCtxRef.current = null;
-    };
-  }, [state]);
 
   if (state.status === "loading") return null;
 
@@ -129,23 +55,134 @@ export default function ViewPage() {
   }
 
   return (
-    <SceneStateProvider initialScene={state.scene}>
-      <ViewContent
-        needsClickToPlay={needsClickToPlay}
-        onNewSketch={() => router.push("/upload")}
-      />
+    <SceneStateProvider initialScene={state.scene} initialMusicUrl={state.musicUrl}>
+      <ViewContent onNewSketch={() => router.push("/upload")} />
     </SceneStateProvider>
   );
 }
 
-function ViewContent({
-  needsClickToPlay,
-  onNewSketch,
-}: {
-  needsClickToPlay: boolean;
-  onNewSketch: () => void;
-}) {
-  const { scene } = useSceneState();
+function ViewContent({ onNewSketch }: { onNewSketch: () => void }) {
+  const { scene, musicUrl } = useSceneState();
+  const [needsClickToPlay, setNeedsClickToPlay] = useState(false);
+
+  // Audio refs persist across renders so we can stop / replace sources
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+
+  // Whenever musicUrl changes (initial load OR regenerate), decode and play.
+  // Uses Web Audio API's BufferSource with loop=true for gapless playback.
+  useEffect(() => {
+    if (!musicUrl) {
+      try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+      sourceRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupAudio = async () => {
+      try {
+        console.log("Music: starting setup");
+
+        // Create or reuse the AudioContext
+        let ctx = audioCtxRef.current;
+        if (!ctx) {
+          const Ctx =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          ctx = new Ctx();
+          audioCtxRef.current = ctx;
+          console.log("Music: created AudioContext, initial state =", ctx.state);
+        }
+
+        // Fetch the audio bytes
+        const res = await fetch(musicUrl);
+        if (!res.ok) throw new Error(`Failed to fetch music: ${res.status}`);
+        const arrayBuf = await res.arrayBuffer();
+        console.log("Music: fetched", arrayBuf.byteLength, "bytes");
+
+        // Decode (slice to avoid mutation issues with re-decoding)
+        const audioBuf = await ctx.decodeAudioData(arrayBuf.slice(0));
+        console.log("Music: decoded, duration =", audioBuf.duration.toFixed(2), "s");
+
+        if (cancelled) return;
+
+        // Stop the previous source BEFORE starting the new one
+        try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+
+        // Build the source. Web Audio's loop=true is sample-accurate gapless —
+        // there's no extra latency between loop end and loop start.
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuf;
+        source.loop = true;
+        // Loop the entire buffer. No trimming — let the original audio repeat as-is.
+        // (If you hear a click at the loop point, change loopStart/End.)
+        source.loopStart = 0;
+        source.loopEnd = audioBuf.duration;
+
+        // Reuse / create gain node (volume)
+        let gain = gainRef.current;
+        if (!gain) {
+          gain = ctx.createGain();
+          gain.gain.value = 0.5;
+          gain.connect(ctx.destination);
+          gainRef.current = gain;
+        }
+
+        source.connect(gain);
+        source.start();
+        sourceRef.current = source;
+        console.log("Music: source started, looping enabled");
+
+        // If the audio context is suspended (browser autoplay policy), we
+        // need a user gesture to resume. Listen for any input.
+        if (ctx.state === "suspended") {
+          console.log("Music: context suspended, awaiting user gesture");
+          setNeedsClickToPlay(true);
+
+          const resume = async () => {
+            try {
+              await ctx!.resume();
+              console.log("Music: context resumed, state =", ctx!.state);
+              if (ctx!.state === "running") {
+                setNeedsClickToPlay(false);
+                window.removeEventListener("click", resume);
+                window.removeEventListener("keydown", resume);
+                window.removeEventListener("touchstart", resume);
+              }
+            } catch (e) {
+              console.warn("Music: failed to resume context", e);
+            }
+          };
+          window.addEventListener("click", resume);
+          window.addEventListener("keydown", resume);
+          window.addEventListener("touchstart", resume);
+        } else {
+          setNeedsClickToPlay(false);
+        }
+      } catch (e) {
+        console.error("Music: setup failed", e);
+      }
+    };
+
+    setupAudio();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [musicUrl]);
+
+  // Cleanup the audio context on unmount
+  useEffect(() => {
+    return () => {
+      try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+      audioCtxRef.current?.close();
+      sourceRef.current = null;
+      gainRef.current = null;
+      audioCtxRef.current = null;
+    };
+  }, []);
 
   return (
     <>

@@ -3,6 +3,7 @@
 import { useSceneState } from "@/lib/sceneState";
 import type { FogDensity } from "@/types/scene";
 import { useState } from "react";
+import { MusicControl } from "./MusicControl";
 
 const MOOD_PRESETS: {
   id: string;
@@ -122,6 +123,9 @@ export function EditorPanel() {
               />
             </div>
           </div>
+
+          {/* Music — generate or regenerate the background track */}
+          <MusicControl />
         </div>
       </div>
     </>
