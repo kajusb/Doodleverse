@@ -26,10 +26,7 @@ export function GenerationCard({ generation, isDeleting = false, onDelete }: Gen
   const displayImage = generation.generatedThumbnailUrl || generation.originalImageUrl;
   const title = generation.title?.trim() || generation.theme?.trim() || "Untitled world";
   const viewHref = generation._id
-    ? {
-        pathname: "/view",
-        query: { id: generation._id },
-      }
+    ? { pathname: "/view", query: { id: generation._id } }
     : {
         pathname: "/view",
         query: {
@@ -41,37 +38,77 @@ export function GenerationCard({ generation, isDeleting = false, onDelete }: Gen
       };
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/80 shadow-lg shadow-black/20">
-      {displayImage ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+    <article className="gen-card">
+      {/* Thumbnail */}
+      <div style={{ position: "relative", height: 180, overflow: "hidden", background: "rgba(0,0,0,0.04)" }}>
+        {displayImage ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={displayImage}
             alt={title}
-            className="h-48 w-full object-cover"
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
-        </>
-      ) : (
-        <div className="flex h-48 w-full items-center justify-center bg-slate-800 text-sm text-slate-400">
-          No preview available
-        </div>
-      )}
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              color: "var(--ink-light)",
+            }}
+          >
+            <span style={{ fontSize: 32 }}>🌍</span>
+            <span style={{ fontSize: 12 }}>No preview</span>
+          </div>
+        )}
+      </div>
 
-      <div className="space-y-4 p-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-emerald-300/80">
-            {generation.theme || "unknown"}
+      {/* Body */}
+      <div style={{ padding: "16px 18px 18px" }}>
+        {generation.theme && (
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.24em",
+              textTransform: "uppercase",
+              color: "var(--ink-light)",
+              marginBottom: 6,
+            }}
+          >
+            {generation.theme}
           </p>
-          <h3 className="mt-2 text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-2 text-sm text-slate-300">
-            Created {formatDate(generation.createdAt)}
-          </p>
-        </div>
+        )}
 
-        <div className="flex gap-3">
+        <h3
+          style={{
+            fontFamily: "var(--font-caveat), cursive",
+            fontSize: 20,
+            fontWeight: 700,
+            color: "var(--ink)",
+            marginBottom: 4,
+            lineHeight: 1.2,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {title}
+        </h3>
+
+        <p style={{ fontSize: 12, color: "var(--ink-light)", marginBottom: 18 }}>
+          {formatDate(generation.createdAt)}
+        </p>
+
+        <div style={{ display: "flex", gap: 8 }}>
           <Link
             href={viewHref}
-            className="inline-flex flex-1 items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-emerald-400"
+            className="btn btn-primary btn-sm"
+            style={{ flex: 1, textAlign: "center" }}
           >
             View
           </Link>
@@ -80,9 +117,10 @@ export function GenerationCard({ generation, isDeleting = false, onDelete }: Gen
             type="button"
             onClick={() => generation._id && onDelete(generation._id)}
             disabled={isDeleting || !generation._id}
-            className="inline-flex flex-1 items-center justify-center rounded-lg border border-red-400/50 px-4 py-2 font-medium text-red-100 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-danger btn-sm"
+            style={{ flex: 1 }}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isDeleting ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>

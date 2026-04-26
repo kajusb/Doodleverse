@@ -135,34 +135,136 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6 flex flex-col items-center">
-      <div className="max-w-2xl w-full pt-12">
-        <div className="text-center mb-10">
-          <div className="text-xs uppercase tracking-[0.3em] opacity-60 mb-2">
-            Doodleverse
-          </div>
-          <h1 className="text-4xl font-bold mb-3">Draw a world, walk inside it</h1>
-          <p className="opacity-70">
-            Sketch a top-down map on paper, then upload a photo.
+    <>
+      {/* ── Topbar ── */}
+      <header
+        style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0,
+          height: "58px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 80px",
+          zIndex: 100,
+          background: "rgba(255,255,255,0.86)",
+          borderBottom: "1px solid rgba(0,0,0,0.08)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        {/* Wordmark */}
+        <div
+          style={{
+            fontFamily: "var(--font-caveat), cursive",
+            fontSize: "26px",
+            fontWeight: 700,
+            color: "var(--ink)",
+            letterSpacing: "-0.3px",
+            lineHeight: 1,
+            cursor: "pointer",
+          }}
+          onClick={() => router.push("/")}
+        >
+          Doodle<span style={{ color: "var(--ink-mid)" }}>Verse</span>
+        </div>
+
+        {/* Nav tabs */}
+        <nav style={{ display: "flex", gap: "4px" }}>
+          {[
+            { label: "create",  path: "/upload",      active: true  },
+            { label: "gallery", path: "/generations", active: false },
+            { label: "sample",  path: "/sample",      active: false },
+          ].map(({ label, path, active }) => (
+            <button
+              key={label}
+              onClick={() => router.push(path)}
+              disabled={loading}
+              style={{
+                fontFamily: "var(--font-patrick-hand), cursive",
+                fontSize: "13px",
+                padding: "6px 18px",
+                borderRadius: "20px",
+                border: active ? "1.5px solid rgba(0,0,0,0.15)" : "1.5px solid transparent",
+                background: active ? "rgba(0,0,0,0.05)" : "transparent",
+                color: active ? "var(--ink)" : "var(--ink-mid)",
+                fontWeight: active ? 600 : 400,
+                cursor: loading ? "not-allowed" : "pointer",
+                textTransform: "capitalize",
+                transition: "all 0.18s",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Spacer */}
+        <div style={{ width: "150px" }} />
+      </header>
+
+      {/* ── Main ── */}
+      <main
+        style={{
+          paddingTop: "58px",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "14px",
+          fontFamily: "var(--font-patrick-hand), cursive",
+          color: "var(--ink)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Hero */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+          <h1
+            style={{
+              fontFamily: "var(--font-caveat), cursive",
+              fontSize: "clamp(2.2rem, 5vw, 3.2rem)",
+              fontWeight: 700,
+              color: "var(--ink)",
+              lineHeight: 1,
+              textAlign: "center",
+            }}
+          >
+            Draw a world, walk inside it
+          </h1>
+          <p style={{ fontSize: "14px", color: "var(--ink-light)", letterSpacing: "0.4px", textAlign: "center" }}>
+            Sketch a top-down map · upload a photo · explore your world in 3D
           </p>
         </div>
 
-        {/* Drop zone */}
+        {/* Upload zone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-8 cursor-pointer transition ${
-            dragging ? "border-emerald-400 bg-emerald-400/10" : "border-slate-600 hover:border-slate-400"
-          } ${previewUrl ? "bg-slate-800/50" : "bg-slate-800/30"}`}
+          onClick={() => !previewUrl && inputRef.current?.click()}
+          style={{
+            width: "400px",
+            maxWidth: "90vw",
+            border: dragging ? "2px dashed rgba(0,0,0,0.40)" : "2px dashed rgba(0,0,0,0.18)",
+            borderRadius: "16px",
+            padding: previewUrl ? "16px" : "28px 24px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "10px",
+            cursor: previewUrl ? "default" : "pointer",
+            background: dragging ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 18px rgba(0,0,0,0.07)",
+            transition: "all 0.22s",
+          }}
         >
           <input
             ref={inputRef}
             type="file"
             accept="image/*"
             capture="environment"
-            className="hidden"
+            style={{ display: "none" }}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) pickFile(f);
@@ -170,73 +272,180 @@ export default function UploadPage() {
           />
 
           {previewUrl ? (
-            <div className="flex flex-col items-center">
+            <div style={{ width: "100%", position: "relative" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={previewUrl} alt="sketch preview" className="max-h-80 rounded-lg shadow-lg" />
-              <div className="mt-3 text-sm opacity-70">
-                {file?.name} — click or drop to replace
-              </div>
+              <img
+                src={previewUrl}
+                alt="sketch preview"
+                style={{
+                  width: "100%",
+                  maxHeight: "200px",
+                  objectFit: "cover",
+                  borderRadius: "10px",
+                  display: "block",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.10)",
+                }}
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+                style={{
+                  position: "absolute",
+                  top: "8px",
+                  right: "8px",
+                  fontFamily: "var(--font-patrick-hand), cursive",
+                  fontSize: "12px",
+                  padding: "4px 12px",
+                  borderRadius: "20px",
+                  border: "1.5px solid rgba(0,0,0,0.18)",
+                  background: "rgba(255,255,255,0.92)",
+                  color: "var(--ink)",
+                  cursor: "pointer",
+                }}
+              >
+                Change
+              </button>
+              <p style={{ marginTop: "8px", fontSize: "12px", color: "var(--ink-light)", textAlign: "center" }}>
+                {file?.name}
+              </p>
             </div>
           ) : (
-            <div className="text-center py-10">
-              <div className="text-5xl mb-3">📄</div>
-              <div className="font-semibold mb-1">Click to upload or drag a photo here</div>
-              <div className="text-sm opacity-60">JPG or PNG</div>
-            </div>
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/pencil.png"
+                alt=""
+                aria-hidden="true"
+                style={{
+                  width: "80px",
+                  height: "80px",
+                  objectFit: "contain",
+                  transform: "rotate(-30deg)",
+                  pointerEvents: "none",
+                  filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.15))",
+                  transition: "transform 0.3s ease",
+                }}
+              />
+              <div>
+                <p style={{ fontSize: "15px", color: "var(--ink)", textAlign: "center", fontFamily: "var(--font-patrick-hand), cursive" }}>
+                  Drop your photo here, or{" "}
+                  <span
+                    style={{ color: "var(--ink-mid)", textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}
+                    onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+                  >
+                    browse
+                  </span>
+                </p>
+                <p style={{ fontSize: "12px", color: "var(--ink-light)", textAlign: "center", marginTop: "3px" }}>
+                  PNG, JPG — up to 10 MB
+                </p>
+              </div>
+            </>
           )}
         </div>
 
-        {/* Music opt-in toggle */}
-        <label className="mt-5 flex items-center gap-3 cursor-pointer select-none">
+        {/* Music toggle */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            cursor: "pointer",
+            userSelect: "none",
+            padding: "10px 16px",
+            borderRadius: "12px",
+            border: `1.5px solid ${withMusic ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.09)"}`,
+            background: withMusic ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.70)",
+            transition: "all 0.18s",
+          }}
+        >
           <input
             type="checkbox"
             checked={withMusic}
             onChange={(e) => setWithMusic(e.target.checked)}
             disabled={loading}
-            className="w-5 h-5 accent-purple-500 cursor-pointer"
+            style={{ display: "none" }}
           />
-          <span className="text-sm">
-            <span className="font-semibold">♪ Generate background music</span>
-            <span className="opacity-60 ml-2">(adds ~30s)</span>
+          <span
+            style={{
+              flexShrink: 0,
+              width: "18px",
+              height: "18px",
+              borderRadius: "5px",
+              border: `2px solid ${withMusic ? "var(--ink)" : "rgba(0,0,0,0.22)"}`,
+              background: withMusic ? "var(--ink)" : "rgba(255,255,255,0.9)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.15s",
+            }}
+          >
+            {withMusic && (
+              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                <path d="M1 4L3.5 6.5L9 1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          <span>
+            <span style={{ fontFamily: "var(--font-caveat), cursive", fontSize: "17px", fontWeight: 600, color: "var(--ink)" }}>
+              ♪ Generate background music
+            </span>
+            <span style={{ fontSize: "12px", color: "var(--ink-light)", marginLeft: "8px" }}>(adds ~30 s)</span>
           </span>
         </label>
 
+        {/* Error */}
         {error && (
-          <div className="mt-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-sm">
+          <div
+            style={{
+              padding: "10px 16px",
+              borderRadius: "10px",
+              background: "rgba(180,40,40,0.06)",
+              border: "1.5px solid rgba(180,40,40,0.20)",
+              color: "#922",
+              fontSize: "13px",
+              fontFamily: "var(--font-patrick-hand), cursive",
+              maxWidth: "400px",
+              width: "90vw",
+              textAlign: "center",
+            }}
+          >
             {error}
           </div>
         )}
 
-        <div className="mt-6 flex gap-3 justify-center">
-          <button
-            onClick={() => router.push("/generations")}
-            disabled={loading}
-            className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 transition"
-          >
-            Saved worlds
-          </button>
-          <button
-            onClick={() => router.push("/sample")}
-            disabled={loading}
-            className="px-5 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 transition"
-          >
-            View sample world
-          </button>
-          <button
-            onClick={generate}
-            disabled={!file || loading}
-            className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:cursor-not-allowed transition font-semibold"
-          >
-            {loading ? "Generating…" : "Generate world"}
-          </button>
-        </div>
+        {/* CTA */}
+        <button
+          onClick={generate}
+          disabled={!file || loading}
+          style={{
+            fontFamily: "var(--font-caveat), cursive",
+            fontSize: "18px",
+            padding: "10px 32px",
+            borderRadius: "20px",
+            border: "none",
+            background: !file || loading ? "rgba(0,0,0,0.15)" : "var(--ink)",
+            color: "#fff",
+            cursor: !file || loading ? "not-allowed" : "pointer",
+            boxShadow: !file || loading ? "none" : "0 4px 16px rgba(0,0,0,0.18)",
+            transition: "all 0.18s",
+            opacity: !file || loading ? 0.55 : 1,
+          }}
+        >
+          {loading ? "Generating…" : "✦ Generate world"}
+        </button>
 
-        {loading && loadingStage && (
-          <div className="mt-6 text-center text-sm opacity-70">
-            {loadingStage}
-          </div>
+        {/* Hints */}
+        {!file && !loading && (
+          <p style={{ fontSize: "12px", color: "var(--ink-light)", marginTop: "-6px" }}>
+            ← Upload a photo to begin
+          </p>
         )}
-      </div>
-    </div>
+        {loading && loadingStage && (
+          <p style={{ fontSize: "13px", color: "var(--ink-light)", fontFamily: "var(--font-patrick-hand), cursive" }}>
+            {loadingStage}
+          </p>
+        )}
+      </main>
+    </>
   );
 }

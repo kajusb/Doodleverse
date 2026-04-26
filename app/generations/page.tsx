@@ -2,20 +2,55 @@ import { SavedGenerations } from "@/components/SavedGenerations";
 
 export default function GenerationsPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800 px-6 py-12 text-white">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.3em] text-emerald-300/80">
-            Doodleverse Library
-          </p>
-          <h1 className="text-4xl font-bold">Saved worlds</h1>
-          <p className="max-w-2xl text-slate-300">
-            Every generation is scoped to the signed-in user, so each person only sees their own Meshy worlds and audio.
-          </p>
-        </div>
+    <>
+      <header className="topbar">
+        <a href="/upload" className="topbar-wordmark">Doodleverse</a>
+        <nav className="topbar-nav">
+          <a href="/upload" className="topbar-nav-btn">Create</a>
+          <a href="/generations" className="topbar-nav-btn active">Gallery</a>
+          <a href="/sample" className="topbar-nav-btn">Sample</a>
+        </nav>
+        <div className="topbar-actions" />
+      </header>
 
-        <SavedGenerations />
+      <div className="page-shell">
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 32px 80px" }}>
+          {/* Page header */}
+          <div className="anim-fade-up" style={{ marginBottom: 40 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.28em",
+                textTransform: "uppercase",
+                color: "var(--ink-light)",
+                marginBottom: 10,
+              }}
+            >
+              Your library
+            </p>
+            <h1
+              style={{
+                fontFamily: "var(--font-caveat), cursive",
+                fontSize: 42,
+                fontWeight: 700,
+                color: "var(--ink)",
+                lineHeight: 1.1,
+                marginBottom: 12,
+              }}
+            >
+              Saved worlds
+            </h1>
+            <p style={{ color: "var(--ink-mid)", fontSize: 15, maxWidth: 520, lineHeight: 1.65 }}>
+              Each generation is scoped to your account — only you can see your saved worlds.
+            </p>
+          </div>
+
+          <div className="anim-fade-up anim-d2">
+            <SavedGenerations />
+          </div>
+        </div>
       </div>
-    </main>
+    </>
   );
 }

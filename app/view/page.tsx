@@ -260,64 +260,149 @@ export default function ViewPage() {
 
   if (state.status === "missing") {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
-        <div className="text-xl mb-3">No generated scene found</div>
-        <button
-          onClick={() => router.push("/upload")}
-          className="px-5 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 font-semibold"
-        >
-          Upload a sketch
-        </button>
-      </div>
+      <>
+        <header className="topbar">
+          <a href="/upload" className="topbar-wordmark">Doodleverse</a>
+        </header>
+        <div className="page-shell flex items-center justify-center">
+          <div
+            className="card anim-fade-up"
+            style={{ maxWidth: 400, width: "100%", margin: "0 16px", padding: "48px 36px", textAlign: "center" }}
+          >
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🌍</div>
+            <h2
+              style={{
+                fontFamily: "var(--font-caveat), cursive",
+                fontSize: 26,
+                fontWeight: 700,
+                color: "var(--ink)",
+                marginBottom: 10,
+              }}
+            >
+              No scene found
+            </h2>
+            <p style={{ color: "var(--ink-mid)", fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>
+              Upload a sketch to generate your 3D world.
+            </p>
+            <button className="btn btn-primary" onClick={() => router.push("/upload")}>
+              ← Create a world
+            </button>
+          </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <>
+    <div style={{ position: "relative", width: "100vw", height: "100vh", overflow: "hidden" }}>
+      {/* Scene fills the full viewport */}
       <Scene scene={state.scene} />
 
-      <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-3">
-        <button
-          onClick={() => router.push("/upload")}
-          className="rounded-lg bg-black/50 px-4 py-2 text-sm text-white backdrop-blur-sm transition hover:bg-black/70"
+      {/* Topbar overlay */}
+      <header
+        style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0,
+          height: "var(--topbar)",
+          zIndex: 100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          background: "rgba(255,255,255,0.86)",
+          borderBottom: "1px solid var(--border)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+        }}
+      >
+        <a
+          href="/upload"
+          style={{
+            fontFamily: "var(--font-caveat), cursive",
+            fontSize: 22,
+            fontWeight: 700,
+            color: "var(--ink)",
+            letterSpacing: "-0.3px",
+          }}
         >
-          ← New sketch
-        </button>
-        <button
-          onClick={() => router.push("/generations")}
-          className="rounded-lg bg-black/50 px-4 py-2 text-sm text-white backdrop-blur-sm transition hover:bg-black/70"
-        >
-          Saved worlds
-        </button>
-        {(savePayload || isSaved) && (
-          <button
-            onClick={() => void handleSaveWorld()}
-            disabled={isSaving || isSaved}
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-200"
-          >
-            {isSaving ? "Saving..." : isSaved ? "Saved" : "Save World"}
-          </button>
-        )}
-      </div>
+          Doodleverse
+        </a>
 
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={() => router.push("/upload")}
+          >
+            ← New sketch
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => router.push("/generations")}
+          >
+            Gallery
+          </button>
+          {(savePayload || isSaved) && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => void handleSaveWorld()}
+              disabled={isSaving || isSaved}
+            >
+              {isSaving ? "Saving…" : isSaved ? "✓ Saved" : "Save world"}
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Status toast */}
       {(saveSuccess || saveError) && (
         <div
-          className={`absolute right-4 top-20 z-10 rounded-lg px-4 py-3 text-sm backdrop-blur-sm ${
-            saveError
-              ? "bg-red-500/20 text-red-100 border border-red-500/40"
-              : "bg-emerald-500/20 text-emerald-50 border border-emerald-400/40"
-          }`}
+          style={{
+            position: "absolute",
+            top: "calc(var(--topbar) + 12px)",
+            right: 24,
+            zIndex: 110,
+            borderRadius: "var(--radius-sm)",
+            padding: "10px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            background: saveError ? "rgba(176,48,48,0.12)" : "rgba(255,255,255,0.88)",
+            border: saveError
+              ? "1.5px solid rgba(176,48,48,0.30)"
+              : "1.5px solid rgba(0,0,0,0.12)",
+            color: saveError ? "#b03030" : "var(--ink)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+          className="anim-fade-up"
         >
           {saveError ?? saveSuccess}
         </div>
       )}
 
-      {/* Subtle hint if browser blocked music autoplay */}
+      {/* Music hint */}
       {needsClickToPlay && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-sm text-white rounded-lg text-sm pointer-events-none">
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 110,
+            background: "rgba(17,17,17,0.72)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            color: "#fff",
+            borderRadius: 24,
+            padding: "8px 20px",
+            fontSize: 13,
+            pointerEvents: "none",
+            letterSpacing: "0.01em",
+          }}
+        >
           Click anywhere to enable music
         </div>
       )}
-    </>
+    </div>
   );
 }
